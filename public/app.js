@@ -325,6 +325,23 @@ $('#btn-load').addEventListener('click', async () => {
 });
 $('#btn-run').addEventListener('click', run);
 
+// Import a genuine n8n export: send it to the engine's importer, then load the
+// returned graph onto the canvas (B19).
+$('#btn-import').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const res = await fetch('/import/n8n', { method: 'POST', headers: { 'content-type': 'application/json' }, body: text }).then((r) => r.json());
+  if (res.error) { $('#run-status').textContent = 'import failed: ' + res.error; return; }
+  state.defId = null;
+  $('#automation-name').value = res.name || 'Imported workflow';
+  loadGraph(res.graph);
+  history.replaceState(null, '', location.pathname);
+  $('#run-status').textContent = 'imported ' + (res.name || '') + ' (' + res.graph.nodes.length + ' steps)';
+  $('#run-status').dataset.imported = 'true';
+});
+
 // On load: if ?def=ID present, restore from durable storage (B15 fresh session).
 const params = new URLSearchParams(location.search);
 if (params.get('def')) loadById(params.get('def'));

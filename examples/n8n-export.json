@@ -1,0 +1,91 @@
+{
+  "name": "Lead qualifier",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/leads/42",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "secret-key-123" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1d2e3f4-1111-4aaa-8bbb-aaaaaaaaaaaa",
+      "name": "Fetch lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c0nd-1111",
+              "leftValue": "={{ $json.body.score }}",
+              "rightValue": 50,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1d2e3f4-2222-4aaa-8bbb-bbbbbbbbbbbb",
+      "name": "Score > 50?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "status", "value": "qualified", "type": "string" },
+            { "id": "a2", "name": "tier", "value": "gold", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1d2e3f4-3333-4aaa-8bbb-cccccccccccc",
+      "name": "Mark qualified",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { status: 'rejected', reason: 'low score' } }];"
+      },
+      "id": "b1d2e3f4-4444-4aaa-8bbb-dddddddddddd",
+      "name": "Reject lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 420]
+    }
+  ],
+  "connections": {
+    "Fetch lead": {
+      "main": [
+        [ { "node": "Score > 50?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Score > 50?": {
+      "main": [
+        [ { "node": "Mark qualified", "type": "main", "index": 0 } ],
+        [ { "node": "Reject lead", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "a7c3e9d2-0000-4f00-9a00-1234567890ab",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "abcdef0123456789" },
+  "pinData": {}
+}

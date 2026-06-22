@@ -129,7 +129,18 @@ to `SHOT_DIR` and exits non-zero on any failed assertion):
 SHOT_DIR=/tmp npm run e2e:canvas    # canvas loads; palette places matching steps
 SHOT_DIR=/tmp npm run e2e:builder   # connect/disconnect, branch ports, config, save & reload in a fresh session
 SHOT_DIR=/tmp npm run e2e:run       # run from canvas; live status; skipped branch; inspect output
+SHOT_DIR=/tmp npm run e2e:import    # import a genuine n8n export; mapped steps/connections/config; runnable
 ```
+
+## Importing an n8n workflow (Iteration 3)
+
+Click **Import n8n…** in the builder and choose a genuine n8n workflow export
+(`examples/n8n-export.json` is a sample using supported node types). The steps,
+connections (including branch true/false routes), and per-step settings are
+mapped onto the canvas as equivalent supported steps, ready to edit and run.
+
+The mapping is also available as an API: `POST /import/n8n` with the n8n export
+as the body returns `{ name, graph }`.
 
 ## Configuration
 

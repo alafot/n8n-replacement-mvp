@@ -20,6 +20,7 @@ import {
   updateDefinition,
   deleteDefinition,
 } from './store';
+import { importN8nWorkflow, N8nExport } from './importN8n';
 import type { Items } from './itemFormat';
 import { ADDRESS, NAMESPACE, TASK_QUEUE } from './temporal';
 
@@ -205,6 +206,16 @@ async function main(): Promise<void> {
       definitionId: def.id,
       status: 'in-progress',
     });
+  });
+
+  // --- B19: import a genuine n8n workflow export -> engine graph. ---
+  app.post('/import/n8n', async (request, reply) => {
+    try {
+      const imported = importN8nWorkflow(request.body as N8nExport);
+      return reply.code(200).send(imported);
+    } catch (err: any) {
+      return reply.code(400).send({ error: String(err?.message ?? err) });
+    }
   });
 
   // --- B17: per-step status & output for a run, observable during and after. ---
