@@ -14,6 +14,7 @@ const STEP_TYPES = [
   { type: 'wait', label: 'Wait', hint: 'Pause', category: 'Flow', icon: '⏱️', desc: 'Pause the run for a configured time, then pass items through unchanged.' },
   { type: 'noop', label: 'No operation', hint: 'No-Op', category: 'Flow', icon: '➡️', desc: 'A no-op: passes items straight through unchanged.' },
   { type: 'stopError', label: 'Stop and error', hint: 'Stop And Error', category: 'Flow', icon: '🛑', desc: 'Deliberately fail the run with a custom error message, aborting downstream.' },
+  { type: 'executeSubworkflow', label: 'Execute sub-workflow', hint: 'Execute Workflow', category: 'Actions', icon: '📦', desc: 'Run another saved automation as a step, feeding it these items and returning its results.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -49,6 +50,7 @@ function defaultParams(type) {
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
+  if (type === 'executeSubworkflow') return { definitionId: '' };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -459,6 +461,17 @@ function renderConfig() {
     c.appendChild(note);
     n.params.message = n.params.message ?? 'Stopped with error';
     c.appendChild(field('Error message', 'cfg-error-message', input(n.params.message, (v) => (n.params.message = v))));
+  } else if (n.type === 'executeSubworkflow') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Runs the selected saved automation with these items as its input.';
+    c.appendChild(note);
+    const sel = document.createElement('select');
+    const ph = document.createElement('option'); ph.value = ''; ph.textContent = '— select a saved automation —'; sel.appendChild(ph);
+    sel.addEventListener('change', () => { n.params.definitionId = sel.value; });
+    c.appendChild(field('Sub-workflow', 'cfg-subworkflow', sel));
+    // Populate from the saved definitions list (async).
+    fetch('/definitions').then((r) => r.json()).then((list) => {
+      for (const d of list) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name + ' (' + d.id.slice(0, 12) + '…)'; if (n.params.definitionId === d.id) o.selected = true; sel.appendChild(o); }
+    }).catch(() => {});
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

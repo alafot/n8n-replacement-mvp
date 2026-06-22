@@ -17,7 +17,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 4 | Loop Over Items | ✅ satisfied | seed(3 items) → Loop(batch 1) → body / done | `loop-over-items/loop-success.png` |
 | 5 | Wait | ✅ satisfied | seed → Wait(2500ms) → sink; measured 2807ms pause | `wait/wait-pausing.png`, `wait/wait-success.png` |
 | 6 | No Operation | ✅ satisfied | seed([3,1,1,2] unsorted+dup) → No-Op → sink | `no-operation/noop-success.png` |
-| 7 | Stop and Error | _pending_ | — | — |
+| 7 | Stop and Error | ✅ satisfied | reached→FAIL w/ message (downstream skipped); not-reached→completes | `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png` |
 | 8 | Execute Sub-workflow | _pending_ | — | — |
 | 9 | Aggregate | _pending_ | — | — |
 | 10 | Split Out | _pending_ | — | — |
@@ -69,3 +69,10 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the No-Op output was identical to its input and the downstream step received the same items unchanged — `[3,1,1,2]` with order and the duplicate preserved (nothing reordered/deduped/added/removed). Screenshot shows the completed run with the No-Op inspector output.
 - Screenshot: `no-operation/noop-success.png`. Demo: `no-operation/demo.mjs`.
 - Assumptions: none (the node has no configuration).
+
+### Node 7 — Stop and Error ✅
+- Two sample scenarios on the real engine:
+  - **Reached:** seed → **Stop and Error** ("Halt: invalid record") → sink. Run ended **failed** carrying the exact message (shown in the run status bar + inspector); downstream sink stayed `pending` (did not run).
+  - **Not reached:** seed(value 5) → IF(value>100) → [true] Stop and Error / [false] sink. False branch taken → run **completed** normally, Stop and Error `skipped`, no spurious failure.
+- Screenshots: `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png`. Demo: `stop-and-error/demo.mjs`.
+- Assumptions: none. (Note: for this node a *failed* run is the correct/successful outcome — that's the node doing its job.)

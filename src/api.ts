@@ -61,6 +61,21 @@ async function buildClient(): Promise<Client> {
 
 async function main(): Promise<void> {
   const client = await buildClient();
+  // Resolve Execute Sub-workflow references to the referenced saved definition's
+  // graph, embedding it so the engine can run it inline (B39). Recurses so a
+  // sub-workflow may itself reference others; depth-guarded against cycles.
+  const resolveSubworkflows = (graph: GraphDef, depth = 0): GraphDef => {
+    const clone: GraphDef = JSON.parse(JSON.stringify(graph));
+    if (depth > 10) return clone;
+    for (const node of clone.nodes as any[]) {
+      if (node.type === 'executeSubworkflow' && node.params && node.params.definitionId) {
+        const def = getDefinition(node.params.definitionId);
+        if (def && def.graph) node.params.subGraph = resolveSubworkflows(def.graph as GraphDef, depth + 1);
+      }
+    }
+    return clone;
+  };
+
   const app = Fastify({ logger: false });
 
   // Tolerate an empty body on application/json POSTs (e.g. triggering a stored
@@ -113,7 +128,7 @@ async function main(): Promise<void> {
     const handle = await client.workflow.start(runGraph, {
       taskQueue: TASK_QUEUE,
       workflowId: runId,
-      args: [def],
+      args: [resolveSubworkflows(def)],
     });
     recordRunStart({ runId, automationName: name, startedAt: new Date().toISOString(), graph: def });
 
@@ -210,7 +225,7 @@ async function main(): Promise<void> {
     const handle = await client.workflow.start(runGraph, {
       taskQueue: TASK_QUEUE,
       workflowId: runId,
-      args: [def.graph],
+      args: [resolveSubworkflows(def.graph as GraphDef)],
     });
     recordRunStart({ runId, automationName: def.name, automationId: def.id, startedAt: new Date().toISOString(), graph: def.graph });
 
@@ -348,7 +363,7 @@ async function main(): Promise<void> {
     const handle = await client.workflow.start(runGraph, {
       taskQueue: TASK_QUEUE,
       workflowId: runId,
-      args: [original.graph as GraphDef],
+      args: [resolveSubworkflows(original.graph as GraphDef)],
     });
     // A NEW, distinct history entry for the SAME automation (original kept).
     recordRunStart({

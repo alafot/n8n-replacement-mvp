@@ -126,7 +126,9 @@ with the accumulated results. The Wait step pauses the run for a configured
 duration (durable timer), then passes its items through unchanged. The No
 Operation step is a true pass-through (items go straight through unchanged). The
 Stop and Error step deliberately fails the run with a custom message when
-reached, aborting downstream.
+reached, aborting downstream. The Execute Sub-workflow step runs another saved
+automation as a single step, feeding it the parent's items and returning its
+results into the parent.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

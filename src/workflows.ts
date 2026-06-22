@@ -232,6 +232,16 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
         for (const b of bodyNodes) active.add(b); // body nodes ran (not 'skipped')
         emit = { done: accumulated };
         meta = { iterations: batches.length, batchSize, batchItemCounts: batches.map((b) => b.length) };
+      } else if (node.type === 'executeSubworkflow') {
+        // Run a SEPARATE saved automation (its graph is resolved & embedded at
+        // trigger time) with the parent's items as input; return its results.
+        const sub = (node.params as any).subGraph as GraphDefinition | undefined;
+        if (!sub || !Array.isArray(sub.nodes) || !sub.nodes.length) {
+          throw ApplicationFailure.create({ message: 'Execute Sub-workflow: no saved automation selected/resolved', nonRetryable: true });
+        }
+        const subRoots = sub.nodes.filter((sn) => !sub.connections.some((c) => c.to === sn.id)).map((sn) => sn.id);
+        const subOut = await runScopedSlice(sub, new Set(sub.nodes.map((sn) => sn.id)), subRoots, input, {});
+        emit = { main: subOut };
       } else {
         emit = await execOne(node, input);
       }
