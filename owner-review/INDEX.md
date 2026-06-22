@@ -15,7 +15,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | UX | Palette redesign (categories, icons, tooltips) | ✅ satisfied | categorized palette + hover tooltip | `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png` |
 | 3 | Merge | ✅ satisfied | 2 branches (A:2 items + B:1) → Merge(append) → sink | `merge/merge-success.png` |
 | 4 | Loop Over Items | ✅ satisfied | seed(3 items) → Loop(batch 1) → body / done | `loop-over-items/loop-success.png` |
-| 5 | Wait | _pending_ | — | — |
+| 5 | Wait | ✅ satisfied | seed → Wait(2500ms) → sink; measured 2807ms pause | `wait/wait-pausing.png`, `wait/wait-success.png` |
 | 6 | No Operation | _pending_ | — | — |
 | 7 | Stop and Error | _pending_ | — | — |
 | 8 | Execute Sub-workflow | _pending_ | — | — |
@@ -57,3 +57,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the loop body ran **3 times** (once per item at batch size 1), every item reached the done path **exactly once** (ids 1,2,3, iterations 0,1,2), all `processed:true`, and the done path completed after the final batch. Screenshot shows the completed run with the done-path output.
 - Screenshot: `loop-over-items/loop-success.png`. Demo: `loop-over-items/demo.mjs`.
 - Assumptions: demoed at batch size 1 (the node also takes larger batch sizes → correspondingly fewer iterations, still every item once).
+
+### Node 5 — Wait ✅
+- Sample workflow: seed → **Wait** (2500 ms) → sink. Ran on the real engine.
+- Verified: the run genuinely **paused** at the Wait — measured wall-time **2807 ms** for the configured 2500 ms (not instantaneous) — and the mid-run screenshot shows seed `completed`, Wait `running`, downstream `pending` while it pauses. Items passed through unchanged (`{token:X, n:7}` in == out). Run completed after the wait elapsed.
+- Screenshots: `wait/wait-pausing.png` (the pause in action), `wait/wait-success.png` (completed). Demo: `wait/demo.mjs`.
+- Assumptions: duration entered in milliseconds (the node's unit); demoed 2500 ms.

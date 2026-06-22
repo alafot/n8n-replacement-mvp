@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait' | 'noop';
 
 /** Node ids reachable forward from any of `starts` (following connections). */
 export function reachableFrom(def: GraphDefinition, starts: string[]): Set<string> {

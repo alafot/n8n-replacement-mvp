@@ -119,6 +119,9 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       return { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
     case 'merge':
       return { main: input };
+    case 'noop':
+      // True no-op: pass items straight through, unchanged.
+      return { main: input };
     case 'wait': {
       // Pause the run for the configured time (durable timer), then pass the
       // items through UNCHANGED.
