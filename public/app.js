@@ -286,7 +286,7 @@ async function run() {
   if (state.poll) { clearInterval(state.poll); state.poll = null; }
   state.lastSteps = {};
   const graph = toGraph();
-  const res = await fetch('/workflows/run-graph', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(graph) }).then((r) => r.json());
+  const res = await fetch('/workflows/run-graph', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...graph, name: $('#automation-name').value || 'Untitled automation' }) }).then((r) => r.json());
   state.lastRunId = res.runId;
   $('#run-status').textContent = 'running ' + res.runId;
   $('#run-status').dataset.runId = res.runId;
@@ -324,6 +324,31 @@ $('#btn-load').addEventListener('click', async () => {
   if (id) loadById(id.trim());
 });
 $('#btn-run').addEventListener('click', run);
+
+// Run history (B23): list past runs with automation, time, and outcome.
+const STATUS_COLOR = { completed: '#2f9e44', failed: '#e03131', cancelled: '#868e96', running: '#f08c00' };
+async function showHistory() {
+  const rows = await fetch('/history').then((r) => r.json());
+  const tbody = $('#history-rows');
+  tbody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    tr.dataset.testid = 'history-row';
+    tr.dataset.runId = r.runId;
+    tr.dataset.automation = r.automationName;
+    tr.dataset.status = r.status;
+    tr.style.borderTop = '1px solid #eee';
+    const when = new Date(r.startedAt).toLocaleString();
+    tr.innerHTML =
+      '<td style="padding:6px;" data-testid="history-automation">' + r.automationName + '</td>' +
+      '<td style="padding:6px;" data-testid="history-when">' + when + '</td>' +
+      '<td style="padding:6px; font-weight:600; color:' + (STATUS_COLOR[r.status] || '#333') + '" data-testid="history-status">' + r.status + '</td>';
+    tbody.appendChild(tr);
+  }
+  $('#history-panel').style.display = 'block';
+}
+$('#btn-history').addEventListener('click', showHistory);
+$('#btn-history-close').addEventListener('click', () => { $('#history-panel').style.display = 'none'; });
 
 // Import a genuine n8n export: send it to the engine's importer, then load the
 // returned graph onto the canvas (B19).

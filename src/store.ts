@@ -30,7 +30,58 @@ function handle(): Database.Database {
       graph TEXT NOT NULL
     )
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS runs (
+      run_id          TEXT PRIMARY KEY,
+      automation_name TEXT NOT NULL,
+      automation_id   TEXT,
+      started_at      TEXT NOT NULL,
+      finished_at     TEXT,
+      status          TEXT NOT NULL
+    )
+  `);
   return db;
+}
+
+export type RunOutcome = 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface RunRecord {
+  runId: string;
+  automationName: string;
+  automationId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  status: RunOutcome;
+}
+
+export function recordRunStart(rec: { runId: string; automationName: string; automationId?: string | null; startedAt: string }): void {
+  handle()
+    .prepare('INSERT OR REPLACE INTO runs (run_id, automation_name, automation_id, started_at, status) VALUES (?, ?, ?, ?, ?)')
+    .run(rec.runId, rec.automationName, rec.automationId ?? null, rec.startedAt, 'running');
+}
+
+export function updateRunOutcome(runId: string, status: RunOutcome, finishedAt: string | null): void {
+  handle().prepare('UPDATE runs SET status = ?, finished_at = ? WHERE run_id = ?').run(status, finishedAt, runId);
+}
+
+function rowToRun(r: any): RunRecord {
+  return {
+    runId: r.run_id,
+    automationName: r.automation_name,
+    automationId: r.automation_id,
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    status: r.status,
+  };
+}
+
+export function listRuns(): RunRecord[] {
+  return (handle().prepare('SELECT * FROM runs ORDER BY started_at DESC').all() as any[]).map(rowToRun);
+}
+
+export function getRun(runId: string): RunRecord | null {
+  const r = handle().prepare('SELECT * FROM runs WHERE run_id = ?').get(runId);
+  return r ? rowToRun(r) : null;
 }
 
 export function createDefinition(id: string, name: string, graph: GraphDefinition): StoredDefinition {

@@ -19,6 +19,10 @@ import {
   listDefinitions,
   updateDefinition,
   deleteDefinition,
+  recordRunStart,
+  updateRunOutcome,
+  listRuns,
+  RunOutcome,
 } from './store';
 import { importN8nWorkflow, N8nExport } from './importN8n';
 import { exportToN8n } from './exportN8n';
@@ -95,7 +99,11 @@ async function main(): Promise<void> {
 
   // --- B6: trigger a multi-step GRAPH run, return a handle promptly. ---
   app.post('/workflows/run-graph', async (request, reply) => {
-    const def = (request.body ?? {}) as GraphDefinition;
+    const body = (request.body ?? {}) as any;
+    // Body may be the graph itself ({nodes,connections}) optionally carrying a
+    // `name`, or a { name, graph } wrapper.
+    const def = (Array.isArray(body.nodes) ? body : body.graph ?? {}) as GraphDefinition;
+    const name = (body.name as string) ?? 'Untitled automation';
     if (!Array.isArray(def.nodes) || !def.nodes.length) {
       return reply.code(400).send({ error: 'graph definition must include a non-empty nodes array' });
     }
@@ -106,6 +114,7 @@ async function main(): Promise<void> {
       workflowId: runId,
       args: [def],
     });
+    recordRunStart({ runId, automationName: name, startedAt: new Date().toISOString() });
 
     return reply.code(202).send({
       runId: handle.workflowId,
@@ -202,6 +211,7 @@ async function main(): Promise<void> {
       workflowId: runId,
       args: [def.graph],
     });
+    recordRunStart({ runId, automationName: def.name, automationId: def.id, startedAt: new Date().toISOString() });
 
     return reply.code(202).send({
       runId: handle.workflowId,
@@ -242,6 +252,56 @@ async function main(): Promise<void> {
     // Query the (running or closed) run for its per-step state.
     const steps = await handle.query(getStepsQuery);
     return reply.send({ runId: id, status: toRunStatus(description.status.name), steps });
+  });
+
+  // Map Temporal's status to the run-history outcome vocabulary.
+  const toOutcome = (name: string): RunOutcome => {
+    switch (name) {
+      case 'RUNNING':
+      case 'CONTINUED_AS_NEW':
+        return 'running';
+      case 'COMPLETED':
+        return 'completed';
+      case 'CANCELED':
+      case 'TERMINATED':
+        return 'cancelled';
+      default:
+        return 'failed'; // FAILED, TIMED_OUT
+    }
+  };
+  // Persist a run's terminal outcome to durable history once it settles.
+  const refreshRun = async (runId: string): Promise<void> => {
+    try {
+      const desc = await client.workflow.getHandle(runId).describe();
+      const outcome = toOutcome(desc.status.name);
+      if (outcome !== 'running') {
+        const finishedAt = desc.closeTime ? desc.closeTime.toISOString() : new Date().toISOString();
+        updateRunOutcome(runId, outcome, finishedAt);
+      }
+    } catch {
+      /* run not found in the workflow service (e.g. after its own restart) — keep stored outcome */
+    }
+  };
+
+  // --- B23: persistent history of past runs. ---
+  app.get('/history', async () => {
+    // Settle any still-'running' entries so the history shows correct outcomes.
+    for (const r of listRuns()) {
+      if (r.status === 'running') await refreshRun(r.runId);
+    }
+    return listRuns();
+  });
+
+  // Cancel a run (a user stopping it) -> recorded as 'cancelled' in history.
+  // Uses terminate for a deterministic stop of an in-flight run.
+  app.post<{ Params: { id: string } }>('/runs/:id/cancel', async (request, reply) => {
+    try {
+      await client.workflow.getHandle(request.params.id).terminate('cancelled by user');
+      updateRunOutcome(request.params.id, 'cancelled', new Date().toISOString());
+      return reply.send({ runId: request.params.id, cancelled: true });
+    } catch (err: any) {
+      return reply.code(404).send({ error: String(err?.message ?? err) });
+    }
   });
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));

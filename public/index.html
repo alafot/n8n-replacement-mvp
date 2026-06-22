@@ -86,6 +86,7 @@
       <button id="btn-import" data-testid="btn-import">Import n8n…</button>
       <input id="import-file" data-testid="import-file" type="file" accept=".json,application/json" style="display:none" />
       <button id="btn-export" data-testid="btn-export">Export n8n</button>
+      <button id="btn-history" data-testid="btn-history">History</button>
       <button id="btn-run" data-testid="btn-run">▶ Run</button>
       <span class="status" id="run-status" data-testid="run-status"></span>
       <span class="status" id="import-warning" data-testid="import-warning" style="color:#ffd43b"></span>
@@ -105,6 +106,20 @@
         <h2>Inspector</h2>
         <div id="config" data-testid="config"><p class="hint">Select a step to configure it.</p></div>
       </aside>
+    </div>
+    <div id="history-panel" data-testid="history-panel" style="display:none; position:fixed; inset:0; background:rgba(20,28,42,0.55); z-index:20;">
+      <div style="max-width:760px; margin:60px auto; background:#fff; border-radius:12px; padding:18px; max-height:80vh; overflow:auto;">
+        <div style="display:flex; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0; font-size:14px;">Run history</h2>
+          <button id="btn-history-close" data-testid="btn-history-close" style="margin-left:auto;">Close</button>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead><tr style="text-align:left; color:#6b7280;">
+            <th style="padding:6px;">Automation</th><th style="padding:6px;">When</th><th style="padding:6px;">Outcome</th>
+          </tr></thead>
+          <tbody id="history-rows"></tbody>
+        </table>
+      </div>
     </div>
     <script src="/app.js"></script>
   </body>

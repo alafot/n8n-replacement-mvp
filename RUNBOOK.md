@@ -149,6 +149,15 @@ supported remainder is imported.
 n8n** button (or `POST /export/n8n` with `{ name, graph }`). It round-trips:
 re-importing an exported file reproduces the same steps, wiring, and config.
 
+## Run history (Iteration 4)
+
+Every run is recorded in durable storage (the automation's name, when it ran,
+and its outcome). Click **History** in the builder to see past runs, or
+`GET /history`. Outcomes are `completed` / `failed` / `cancelled` / `running`;
+`POST /runs/:id/cancel` stops an in-flight run (recorded as `cancelled`). The
+history survives engine restarts (it is held in the same on-disk store as
+definitions, independent of the workflow service).
+
 ## Configuration
 
 - `TEMPORAL_ADDRESS` (default `localhost:7233`)
