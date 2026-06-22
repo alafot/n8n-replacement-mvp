@@ -11,6 +11,13 @@ import { Client, Connection } from '@temporalio/client';
 import { runHttpRequest, runGraph } from './workflows';
 import type { HttpRequestInput } from './activities';
 import type { GraphDefinition } from './graph';
+import {
+  createDefinition,
+  getDefinition,
+  listDefinitions,
+  updateDefinition,
+  deleteDefinition,
+} from './store';
 import type { Items } from './itemFormat';
 import { ADDRESS, NAMESPACE, TASK_QUEUE } from './temporal';
 
@@ -45,6 +52,18 @@ async function buildClient(): Promise<Client> {
 async function main(): Promise<void> {
   const client = await buildClient();
   const app = Fastify({ logger: false });
+
+  // Tolerate an empty body on application/json POSTs (e.g. triggering a stored
+  // run takes no payload) — treat empty as {} instead of erroring.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = (body as string).trim();
+    if (!text) return done(null, {});
+    try {
+      done(null, JSON.parse(text));
+    } catch (err) {
+      done(err as Error);
+    }
+  });
 
   // --- B4: trigger a manual run, return a handle promptly. ---
   app.post('/workflows/run', async (request, reply) => {
@@ -132,6 +151,58 @@ async function main(): Promise<void> {
       });
     }
     return reply.send({ runId: id, status, error: { type: description.status.name, message: 'unknown failure' } });
+  });
+
+  // --- B10: CRUD for stored workflow definitions (persisted in SQLite). ---
+  app.post('/definitions', async (request, reply) => {
+    const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDefinition };
+    if (!name || !graph || !Array.isArray(graph.nodes)) {
+      return reply.code(400).send({ error: 'name and graph{nodes,connections} are required' });
+    }
+    const id = `def-${randomId()}`;
+    const created = createDefinition(id, name, graph);
+    return reply.code(201).send(created);
+  });
+
+  app.get('/definitions', async () => listDefinitions());
+
+  app.get<{ Params: { id: string } }>('/definitions/:id', async (request, reply) => {
+    const def = getDefinition(request.params.id);
+    if (!def) return reply.code(404).send({ error: `no such definition: ${request.params.id}` });
+    return def;
+  });
+
+  app.put<{ Params: { id: string } }>('/definitions/:id', async (request, reply) => {
+    const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDefinition };
+    if (!name || !graph) return reply.code(400).send({ error: 'name and graph are required' });
+    const updated = updateDefinition(request.params.id, name, graph);
+    if (!updated) return reply.code(404).send({ error: `no such definition: ${request.params.id}` });
+    return updated;
+  });
+
+  app.delete<{ Params: { id: string } }>('/definitions/:id', async (request, reply) => {
+    const ok = deleteDefinition(request.params.id);
+    if (!ok) return reply.code(404).send({ error: `no such definition: ${request.params.id}` });
+    return reply.code(200).send({ deleted: request.params.id });
+  });
+
+  // --- B11: trigger a run of a STORED definition by reference. ---
+  app.post<{ Params: { id: string } }>('/definitions/:id/run', async (request, reply) => {
+    const def = getDefinition(request.params.id);
+    if (!def) return reply.code(404).send({ error: `no such definition: ${request.params.id}` });
+
+    const runId = `run-${randomId()}`;
+    const handle = await client.workflow.start(runGraph, {
+      taskQueue: TASK_QUEUE,
+      workflowId: runId,
+      args: [def.graph],
+    });
+
+    return reply.code(202).send({
+      runId: handle.workflowId,
+      definitionId: def.id,
+      status: 'in-progress',
+    });
   });
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));

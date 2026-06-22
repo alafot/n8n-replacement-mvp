@@ -2,6 +2,7 @@
 // here, outside the deterministic workflow). Iteration 0 has one step: the
 // caller-configurable HTTP Request step (B2).
 
+import * as vm from 'vm';
 import { Items, Item, makeItem, BinaryDatum } from './itemFormat';
 
 export interface HttpRequestInput {
@@ -99,9 +100,15 @@ export interface CodeStepInput {
  * how a downstream node operates on the data produced by an upstream node.
  */
 export async function runCode(args: CodeStepInput): Promise<Items> {
-  // `$input` is the upstream output; the code returns the node's items.
-  const fn = new Function('$input', args.code);
-  const produced = fn(args.input);
+  // Run caller code in an ISOLATED vm context (B9): the sandbox exposes only
+  // `$input` — no `require`, `process`, `global`, or filesystem — and a wall
+  // clock timeout guards against runaway loops. Misbehaving code throws here,
+  // failing the activity (and so the run) cleanly without touching the engine.
+  const sandbox: Record<string, unknown> = {
+    $input: JSON.parse(JSON.stringify(args.input)), // deep copy: code can't mutate engine state
+  };
+  const script = `(function($input){ ${args.code} })($input)`;
+  const produced = vm.runInNewContext(script, sandbox, { timeout: 1000 });
 
   if (!Array.isArray(produced)) {
     throw new Error('code step must return an array of items');
@@ -112,5 +119,59 @@ export async function runCode(args: CodeStepInput): Promise<Items> {
     const json = it && typeof it.json === 'object' && it.json !== null ? it.json : { value: it };
     const binary: Record<string, BinaryDatum> = it && typeof it.binary === 'object' && it.binary !== null ? it.binary : {};
     return makeItem(json, binary);
+  });
+}
+
+export interface TransformConfig {
+  /** Set literal new fields: { fieldName: value }. */
+  set?: Record<string, unknown>;
+  /** Copy/map values: { destField: "sourceField" } (source read from json). */
+  copy?: Record<string, string>;
+  /** Rename fields: { oldName: newName }. */
+  rename?: Record<string, string>;
+  /** Remove fields by name. */
+  remove?: string[];
+}
+
+export interface TransformStepInput {
+  config: TransformConfig;
+  input: Items;
+}
+
+/**
+ * Transform/Set step (B7). Reshapes each item's `json` per the config. Pure:
+ * operates only on the items passing through, no external calls, deterministic.
+ * Fields not referenced by the config are left intact (it edits a copy rather
+ * than rebuilding the item from scratch).
+ * Order: copy (reads originals) -> set -> rename -> remove.
+ */
+export async function runTransform(args: TransformStepInput): Promise<Items> {
+  const { set, copy, rename, remove } = args.config;
+  return args.input.map((item): Item => {
+    const json: Record<string, unknown> = { ...item.json };
+
+    if (copy) {
+      for (const [dest, source] of Object.entries(copy)) {
+        json[dest] = (item.json as Record<string, unknown>)[source];
+      }
+    }
+    if (set) {
+      for (const [field, value] of Object.entries(set)) {
+        json[field] = value;
+      }
+    }
+    if (rename) {
+      for (const [oldName, newName] of Object.entries(rename)) {
+        if (oldName in json) {
+          json[newName] = json[oldName];
+          delete json[oldName];
+        }
+      }
+    }
+    if (remove) {
+      for (const field of remove) delete json[field];
+    }
+
+    return makeItem(json, { ...item.binary });
   });
 }

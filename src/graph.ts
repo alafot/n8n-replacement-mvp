@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if';
 
 export interface GraphNode {
   /** Unique node id within the graph. */
@@ -18,6 +18,57 @@ export interface GraphConnection {
   from: string;
   /** id of the downstream node receiving that data. */
   to: string;
+  /**
+   * Output port of the upstream node this edge leaves from. For an 'if' node,
+   * 'true' / 'false' select the branch; for all other nodes the default
+   * 'main' is used. An edge is only "taken" when its port matches the upstream
+   * node's decision.
+   */
+  port?: 'main' | 'true' | 'false';
+}
+
+/** A structured, pure boolean condition for the IF node (no code execution). */
+export interface Condition {
+  /** Dot-path into the first input item, e.g. "json.body.value". */
+  left: string;
+  op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'truthy' | 'contains';
+  /** Comparison value (ignored for 'truthy'). */
+  right?: unknown;
+}
+
+/** Read a dot-path out of an object (returns undefined if any segment missing). */
+export function getPath(obj: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((acc, key) => {
+    if (acc !== null && typeof acc === 'object' && key in (acc as Record<string, unknown>)) {
+      return (acc as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, obj);
+}
+
+/** Evaluate a condition against the first input item. Pure and deterministic. */
+export function evaluateCondition(cond: Condition, firstItem: unknown): boolean {
+  const left = getPath(firstItem, cond.left);
+  switch (cond.op) {
+    case 'eq':
+      return left === cond.right;
+    case 'ne':
+      return left !== cond.right;
+    case 'gt':
+      return Number(left) > Number(cond.right);
+    case 'gte':
+      return Number(left) >= Number(cond.right);
+    case 'lt':
+      return Number(left) < Number(cond.right);
+    case 'lte':
+      return Number(left) <= Number(cond.right);
+    case 'truthy':
+      return Boolean(left);
+    case 'contains':
+      return typeof left === 'string' && left.includes(String(cond.right));
+    default:
+      return false;
+  }
 }
 
 export interface GraphDefinition {
