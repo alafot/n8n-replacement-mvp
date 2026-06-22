@@ -151,6 +151,11 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
           // absent from the single narrowed output.
           emit = { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
           break;
+        case 'merge':
+          // Combine items from MULTIPLE incoming branches into one output.
+          // `input` is already the concatenation (append) of every incoming edge.
+          emit = { main: input };
+          break;
         default:
           throw new Error(`unknown node type '${(node as any).type}'`);
       }

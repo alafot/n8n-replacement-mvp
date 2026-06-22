@@ -9,6 +9,7 @@ const STEP_TYPES = [
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
+  { type: 'merge', label: 'Merge inputs', hint: 'Merge', category: 'Flow', icon: '🔗', desc: 'Combine items from multiple incoming branches into one output.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -40,6 +41,7 @@ function defaultParams(type) {
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
+  if (type === 'merge') return { mode: 'append' };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -417,6 +419,14 @@ function renderConfig() {
     sel.addEventListener('change', () => { n.params.condition.op = sel.value; });
     c.appendChild(field('Operator', 'cfg-op', sel));
     c.appendChild(field('Compare value', 'cfg-right', input(String(n.params.condition.right ?? ''), (v) => { const num = Number(v); n.params.condition.right = v !== '' && !Number.isNaN(num) ? num : v; })));
+  } else if (n.type === 'merge') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Combines items from all incoming branches into one output.';
+    c.appendChild(note);
+    n.params.mode = n.params.mode || 'append';
+    const sel = document.createElement('select');
+    for (const m of ['append']) { const o = document.createElement('option'); o.value = m; o.textContent = m; if (n.params.mode === m) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.mode = sel.value; });
+    c.appendChild(field('Combine mode', 'cfg-merge-mode', sel));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

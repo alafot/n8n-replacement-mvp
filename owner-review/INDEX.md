@@ -12,7 +12,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 
 | # | Node | Status | Sample workflow | Screenshot |
 |---|------|--------|-----------------|------------|
-| B33 | Palette redesign (categories, icons, tooltips) | _pending_ | — | — |
+| UX | Palette redesign (categories, icons, tooltips) | ✅ satisfied | categorized palette + hover tooltip | `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png` |
 | 3 | Merge | _pending_ | — | — |
 | 4 | Loop Over Items | _pending_ | — | — |
 | 5 | Wait | _pending_ | — | — |
@@ -37,3 +37,11 @@ and saved a screenshot of the **successful run** here for you to double-check.
 ## Notes log
 
 (Newest entries appended below as each iteration completes.)
+
+### Palette redesign ✅
+- Palette now grouped into n8n-style categories: **Actions / Transform / Flow / Code**, each with a heading.
+- Each node is a compact icon button (🌐 web service, ✏️ reshape, ❓ branch, 🔀 switch, 🔎 filter, 💻 code).
+- Hovering a node shows a tooltip with its name + description (verified: hovering "Route by rules" shows "Route each item to an output by rules (multi-way)").
+- Click-to-add and drag-to-drop both still create the correct step type; no regression.
+- Screenshots: `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png`. Demo: `palette-redesign/demo.mjs`.
+- Assumptions: none.

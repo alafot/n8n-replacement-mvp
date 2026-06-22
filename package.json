@@ -23,7 +23,8 @@
     "e2e:palette-drop": "node e2e/palette-drop.mjs",
     "e2e:switch": "node e2e/switch.mjs",
     "e2e:filter": "node e2e/filter.mjs",
-    "e2e:palette-redesign": "node e2e/palette-redesign.mjs"
+    "e2e:palette-redesign": "node e2e/palette-redesign.mjs",
+    "e2e:merge": "node e2e/merge.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",
