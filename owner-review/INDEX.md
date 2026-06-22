@@ -13,7 +13,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | # | Node | Status | Sample workflow | Screenshot |
 |---|------|--------|-----------------|------------|
 | UX | Palette redesign (categories, icons, tooltips) | ✅ satisfied | categorized palette + hover tooltip | `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png` |
-| 3 | Merge | _pending_ | — | — |
+| 3 | Merge | ✅ satisfied | 2 branches (A:2 items + B:1) → Merge(append) → sink | `merge/merge-success.png` |
 | 4 | Loop Over Items | _pending_ | — | — |
 | 5 | Wait | _pending_ | — | — |
 | 6 | No Operation | _pending_ | — | — |
@@ -45,3 +45,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Click-to-add and drag-to-drop both still create the correct step type; no regression.
 - Screenshots: `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png`. Demo: `palette-redesign/demo.mjs`.
 - Assumptions: none.
+
+### Node 3 — Merge ✅
+- Sample workflow: two code branches (A produces 2 items, B produces 1 item) wired into a **Merge** step (mode: append), then a sink. Ran on the real engine; run **completed**.
+- Verified: the Merge output contained all 3 items together — `{src:A,n:1}`, `{src:A,n:2}`, `{src:B,n:3}` — i.e. items from BOTH inputs appear on the single combined output. Screenshot shows the completed run with the merge inspector output.
+- Screenshot: `merge/merge-success.png`. Demo: `merge/demo.mjs`.
+- Assumptions: used the baseline "append" combine mode for the demo (the node also exposes a mode selector).

@@ -3,7 +3,20 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge' | 'loop';
+
+/** Node ids reachable forward from any of `starts` (following connections). */
+export function reachableFrom(def: GraphDefinition, starts: string[]): Set<string> {
+  const out = new Set<string>(starts);
+  const stack = [...starts];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const c of def.connections) {
+      if (c.from === cur && !out.has(c.to)) { out.add(c.to); stack.push(c.to); }
+    }
+  }
+  return out;
+}
 
 export interface GraphNode {
   /** Unique node id within the graph. */

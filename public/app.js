@@ -10,6 +10,7 @@ const STEP_TYPES = [
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
   { type: 'merge', label: 'Merge inputs', hint: 'Merge', category: 'Flow', icon: '🔗', desc: 'Combine items from multiple incoming branches into one output.' },
+  { type: 'loop', label: 'Loop over items', hint: 'Loop (batches)', category: 'Flow', icon: '🔁', desc: 'Iterate items in batches: run the loop body once per batch, then continue on the done output.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -42,6 +43,7 @@ function defaultParams(type) {
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
   if (type === 'merge') return { mode: 'append' };
+  if (type === 'loop') return { batchSize: 1 };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -49,6 +51,7 @@ function defaultParams(type) {
 // Output ports a node exposes (drives rendering + connection 'port' values).
 function portsOf(node) {
   if (node.type === 'if') return ['true', 'false'];
+  if (node.type === 'loop') return ['loop', 'done'];
   if (node.type === 'switch') {
     const rules = (node.params && Array.isArray(node.params.rules)) ? node.params.rules : [];
     const ports = rules.map((_, i) => String(i));
@@ -61,6 +64,8 @@ function portLabel(port) {
   if (port === 'true') return 'T';
   if (port === 'false') return 'F';
   if (port === 'fallback') return '*';
+  if (port === 'loop') return '↻';
+  if (port === 'done') return '✓';
   if (port === 'main') return '→';
   return String(Number(port) + 1); // rule outputs shown 1-based
 }
@@ -427,6 +432,13 @@ function renderConfig() {
     for (const m of ['append']) { const o = document.createElement('option'); o.value = m; o.textContent = m; if (n.params.mode === m) o.selected = true; sel.appendChild(o); }
     sel.addEventListener('change', () => { n.params.mode = sel.value; });
     c.appendChild(field('Combine mode', 'cfg-merge-mode', sel));
+  } else if (n.type === 'loop') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Runs the loop body once per batch; the done output runs after the final batch.';
+    c.appendChild(note);
+    n.params.batchSize = n.params.batchSize || 1;
+    const inp = input(String(n.params.batchSize), (v) => { const num = Math.max(1, Math.floor(Number(v) || 1)); n.params.batchSize = num; });
+    inp.type = 'number'; inp.min = '1';
+    c.appendChild(field('Batch size', 'cfg-batch-size', inp));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

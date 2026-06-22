@@ -10,9 +10,11 @@ import type { HttpRequestInput } from './activities';
 import type { Items } from './itemFormat';
 import {
   GraphDefinition,
+  GraphNode,
   Condition,
   topologicalOrder,
   evaluateCondition,
+  reachableFrom,
 } from './graph';
 
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
@@ -25,6 +27,8 @@ export interface StepState {
   output?: Items;
   /** Real underlying error cause when the step failed. */
   error?: string;
+  /** Step-type-specific extra info (e.g. a Loop's iteration count). */
+  meta?: Record<string, unknown>;
 }
 
 /** Deepest (most specific) message in an error's cause chain. */
@@ -96,6 +100,73 @@ function routeSwitch(params: any, items: Items): Record<string, Items> {
   return emit;
 }
 
+// Execute a single (non-loop) node, returning its per-output-port items.
+async function execOne(node: GraphNode, input: Items): Promise<Record<string, Items>> {
+  switch (node.type) {
+    case 'httpRequest':
+      return { main: await httpRequest(node.params as unknown as HttpRequestInput) };
+    case 'code':
+      return { main: await runCode({ code: String(node.params.code ?? ''), input }) };
+    case 'transform':
+      return { main: await runTransform({ config: node.params as any, input }) };
+    case 'if': {
+      const decision = evaluateCondition(node.params.condition as Condition, input[0]);
+      return { [decision ? 'true' : 'false']: input };
+    }
+    case 'switch':
+      return routeSwitch(node.params, input);
+    case 'filter':
+      return { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
+    case 'merge':
+      return { main: input };
+    default:
+      throw new Error(`unknown node type '${(node as any).type}'`);
+  }
+}
+
+// Run a sub-DAG (the loop body) once over a seeded batch, returning its terminal
+// output. Records per-node step state (status/input/output) for the body nodes.
+async function runScopedSlice(
+  def: GraphDefinition,
+  bodyNodes: Set<string>,
+  entryNodes: string[],
+  seed: Items,
+  steps: Record<string, StepState>,
+): Promise<Items> {
+  const order = topologicalOrder(def).filter((id) => bodyNodes.has(id));
+  const portOut: Record<string, Record<string, Items>> = {};
+  const active = new Set<string>(entryNodes);
+  const taken = new Set<number>();
+  for (const nodeId of order) {
+    if (!active.has(nodeId)) continue;
+    const node = def.nodes.find((n) => n.id === nodeId)!;
+    const input: Items = entryNodes.includes(nodeId) ? [...seed] : [];
+    def.connections.forEach((c, i) => {
+      if (c.to === nodeId && taken.has(i)) input.push(...(portOut[c.from]?.[c.port ?? 'main'] ?? []));
+    });
+    let emit: Record<string, Items>;
+    try {
+      emit = await execOne(node, input);
+    } catch (err: any) {
+      steps[nodeId] = { status: 'failed', input, error: deepestCause(err) };
+      throw err;
+    }
+    portOut[nodeId] = emit;
+    steps[nodeId] = { status: 'completed', input, output: Object.values(emit).flat() };
+    const gated = node.type === 'if' || node.type === 'switch';
+    def.connections.forEach((c, i) => {
+      if (c.from !== nodeId || !bodyNodes.has(c.to)) return;
+      const port = c.port ?? 'main';
+      if (gated ? emit[port] && emit[port].length > 0 : true) { taken.add(i); active.add(c.to); }
+    });
+  }
+  for (let i = order.length - 1; i >= 0; i--) {
+    const po = portOut[order[i]];
+    if (active.has(order[i]) && po) return Object.values(po).flat();
+  }
+  return [];
+}
+
 export async function runGraph(def: GraphDefinition): Promise<Items> {
   const order = topologicalOrder(def);
   // Per-node, PER-OUTPUT-PORT outputs (a Switch emits different items per port).
@@ -125,51 +196,40 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
     steps[nodeId] = { status: 'running', input }; // observable as 'running'; record the input it received
 
     let emit: Record<string, Items>; // output port -> items
+    let meta: Record<string, unknown> | undefined;
     try {
-      switch (node.type) {
-        case 'httpRequest':
-          emit = { main: await httpRequest(node.params as unknown as HttpRequestInput) };
-          break;
-        case 'code':
-          emit = { main: await runCode({ code: String(node.params.code ?? ''), input }) };
-          break;
-        case 'transform':
-          emit = { main: await runTransform({ config: node.params as any, input }) };
-          break;
-        case 'if': {
-          // Routes ALL items down the matched branch (true/false).
-          const decision = evaluateCondition(node.params.condition as Condition, input[0]);
-          emit = { [decision ? 'true' : 'false']: input };
-          break;
+      if (node.type === 'loop') {
+        // Iterate the input in batches; run the loop-BODY subgraph once per
+        // batch; then continue on the 'done' output with the accumulated results.
+        const batchSize = Math.max(1, Number((node.params as any).batchSize) || 1);
+        const bodyEntry = def.connections.filter((c) => c.from === nodeId && (c.port ?? 'main') === 'loop').map((c) => c.to);
+        const bodyNodes = reachableFrom(def, bodyEntry);
+        const batches: Items[] = [];
+        for (let k = 0; k * batchSize < input.length; k++) {
+          // Tag each item with its iteration index so per-iteration routing is observable.
+          batches.push(input.slice(k * batchSize, (k + 1) * batchSize).map((it) => ({ json: { ...it.json, _iteration: k }, binary: it.binary })));
         }
-        case 'switch':
-          // Per-ITEM multi-way routing across the rule outputs (+ fallback).
-          emit = routeSwitch(node.params, input);
-          break;
-        case 'filter':
-          // Keep only items matching the condition; dropped items are genuinely
-          // absent from the single narrowed output.
-          emit = { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
-          break;
-        case 'merge':
-          // Combine items from MULTIPLE incoming branches into one output.
-          // `input` is already the concatenation (append) of every incoming edge.
-          emit = { main: input };
-          break;
-        default:
-          throw new Error(`unknown node type '${(node as any).type}'`);
+        const accumulated: Items = [];
+        for (let k = 0; k < batches.length; k++) {
+          const out = await runScopedSlice(def, bodyNodes, bodyEntry, batches[k], steps);
+          accumulated.push(...out);
+        }
+        for (const b of bodyNodes) active.add(b); // body nodes ran (not 'skipped')
+        emit = { done: accumulated };
+        meta = { iterations: batches.length, batchSize, batchItemCounts: batches.map((b) => b.length) };
+      } else {
+        emit = await execOne(node, input);
       }
     } catch (err: any) {
       steps[nodeId] = { status: 'failed', input, error: deepestCause(err) };
       throw err;
     }
     portOutputs[nodeId] = emit;
-    steps[nodeId] = { status: 'completed', input, output: Object.values(emit).flat() };
+    steps[nodeId] = { status: 'completed', input, output: Object.values(emit).flat(), ...(meta ? { meta } : {}) };
 
     // Mark which outgoing edges are taken, activating their targets. For gated
-    // nodes (if/switch) an edge is taken only if its port actually has items, so
-    // unmatched outputs (and their downstreams) leave no effect.
-    const gated = node.type === 'if' || node.type === 'switch';
+    // nodes (if/switch/loop) an edge is taken only if its port actually has items.
+    const gated = node.type === 'if' || node.type === 'switch' || node.type === 'loop';
     def.connections.forEach((c, i) => {
       if (c.from !== nodeId) return;
       const port = c.port ?? 'main';
