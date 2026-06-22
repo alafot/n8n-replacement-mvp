@@ -39,14 +39,14 @@ function defaultParams(type) {
   return {};
 }
 
-function addNode(type) {
+function addNode(type, pos) {
   const count = state.nodes.length;
   const node = {
     id: nid(),
     type,
     label: LABELS[type],
-    x: 60 + (count % 3) * 230,
-    y: 60 + Math.floor(count / 3) * 110,
+    x: pos ? Math.max(0, Math.round(pos.x)) : 60 + (count % 3) * 230,
+    y: pos ? Math.max(0, Math.round(pos.y)) : 60 + Math.floor(count / 3) * 110,
     params: defaultParams(type),
   };
   state.nodes.push(node);
@@ -426,9 +426,44 @@ for (const st of STEP_TYPES) {
   btn.dataset.testid = 'palette-item';
   btn.dataset.stepType = st.type;
   btn.innerHTML = st.label + '<span class="ptype">' + st.hint + ' · ' + st.type + '</span>';
+  // Click adds at an auto position (kept for no-regression, B30 E6).
   btn.addEventListener('click', () => addNode(st.type));
+  // Drag a palette entry onto the canvas to drop it at a chosen location (B30).
+  btn.addEventListener('mousedown', (ev) => { state.paletteDrag = { type: st.type, startX: ev.clientX, startY: ev.clientY, moved: false }; });
   palette.appendChild(btn);
 }
+
+// Palette drag-and-drop: create a step at the DROP position on the canvas.
+document.addEventListener('mousemove', (ev) => {
+  const pd = state.paletteDrag;
+  if (!pd) return;
+  if (Math.abs(ev.clientX - pd.startX) > DRAG_THRESHOLD || Math.abs(ev.clientY - pd.startY) > DRAG_THRESHOLD) {
+    pd.moved = true;
+    let ghost = document.getElementById('palette-ghost');
+    if (!ghost) {
+      ghost = document.createElement('div');
+      ghost.id = 'palette-ghost';
+      ghost.style.cssText = 'position:fixed; pointer-events:none; z-index:50; padding:6px 10px; border-radius:8px; background:#eef2ff; border:1px solid #4c6ef5; font-size:12px;';
+      ghost.textContent = LABELS[pd.type];
+      document.body.appendChild(ghost);
+    }
+    ghost.style.left = ev.clientX + 8 + 'px';
+    ghost.style.top = ev.clientY + 8 + 'px';
+  }
+});
+document.addEventListener('mouseup', (ev) => {
+  const pd = state.paletteDrag;
+  if (!pd) return;
+  state.paletteDrag = null;
+  const ghost = document.getElementById('palette-ghost');
+  if (ghost) ghost.remove();
+  if (!pd.moved) return; // a plain click is handled by the click listener
+  const overCanvas = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('#canvas');
+  if (overCanvas) {
+    const r = canvas.getBoundingClientRect();
+    addNode(pd.type, { x: ev.clientX - r.left, y: ev.clientY - r.top }); // create AT the drop position
+  }
+});
 $('#btn-new').addEventListener('click', () => { state.nodes = []; state.connections = []; state.selectedId = null; state.defId = null; state.lastSteps = {}; history.replaceState(null, '', location.pathname); render(); });
 $('#btn-save').addEventListener('click', save);
 $('#btn-load').addEventListener('click', async () => {

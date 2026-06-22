@@ -116,7 +116,8 @@ The left palette lists the available step types (Call a web service, Reshape
 data, Branch on a condition, Run a code snippet); clicking one places a step of
 the matching engine type on the canvas.
 
-From the canvas you can: add steps from the palette, wire them together by
+From the canvas you can: add steps from the palette (click to add, or **drag a
+palette entry onto the canvas to drop it at a chosen location**), wire them together by
 **dragging** from a step's output handle and releasing on a target step (drop
 anywhere on its body — for a branch step, drag from its T / F handle to choose
 the true/false route), **drag a step to reposition** it (its connections follow
