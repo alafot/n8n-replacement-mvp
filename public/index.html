@@ -34,7 +34,9 @@
         position: relative; width: 1600px; height: 1200px;
         background: radial-gradient(circle, #d7dbe2 1px, transparent 1px) 0 0 / 22px 22px;
       }
-      #links { position: absolute; inset: 0; pointer-events: none; }
+      /* Explicit size: an SVG is a replaced element, so inset:0 alone keeps its
+         intrinsic 300x150 box and clips longer connection lines to a stub. */
+      #links { position: absolute; top: 0; left: 0; width: 1600px; height: 1200px; overflow: visible; pointer-events: none; }
       #links line { stroke: #7c8696; stroke-width: 2; }
       .conn-del {
         position: absolute; transform: translate(-50%, -50%); width: 18px; height: 18px; line-height: 16px;

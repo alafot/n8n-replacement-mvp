@@ -18,7 +18,8 @@
     "e2e:inspect": "node e2e/inspect.mjs",
     "e2e:drag-connect": "node e2e/drag-connect.mjs",
     "e2e:drag-move": "node e2e/drag-move.mjs",
-    "e2e:delete-step": "node e2e/delete-step.mjs"
+    "e2e:delete-step": "node e2e/delete-step.mjs",
+    "e2e:render-line": "node e2e/render-line.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",
