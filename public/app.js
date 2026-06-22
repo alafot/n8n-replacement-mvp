@@ -162,6 +162,31 @@ function deleteConnection(connId) {
   render();
 }
 
+// Delete a step WITH confirmation (B29). Nothing is removed until confirmed.
+function promptDeleteStep(nodeId) {
+  state.pendingDelete = nodeId;
+  const n = nodeById(nodeId);
+  const incident = state.connections.filter((c) => c.from === nodeId || c.to === nodeId).length;
+  document.querySelector('#confirm-delete-msg').textContent =
+    `Delete "${n ? n.label : nodeId}" and its ${incident} connection(s)? This cannot be undone.`;
+  document.querySelector('#confirm-delete').style.display = 'flex';
+}
+function confirmDeleteStep() {
+  const nodeId = state.pendingDelete;
+  state.pendingDelete = null;
+  document.querySelector('#confirm-delete').style.display = 'none';
+  if (!nodeId) return;
+  // Remove the step AND every connection to or from it (no orphaned links).
+  state.nodes = state.nodes.filter((n) => n.id !== nodeId);
+  state.connections = state.connections.filter((c) => c.from !== nodeId && c.to !== nodeId);
+  if (state.selectedId === nodeId) state.selectedId = null;
+  render();
+}
+function cancelDeleteStep() {
+  state.pendingDelete = null;
+  document.querySelector('#confirm-delete').style.display = 'none';
+}
+
 // ---- serialization ----
 function toGraph() {
   return {
@@ -215,9 +240,20 @@ function render() {
       ports.appendChild(pe);
     }
     el.appendChild(ports);
+    // Delete affordance on the node (asks for confirmation first — B29).
+    const delBtn = document.createElement('button');
+    delBtn.className = 'node-delete';
+    delBtn.dataset.testid = 'node-delete';
+    delBtn.dataset.nodeId = n.id;
+    delBtn.textContent = '×';
+    delBtn.title = 'delete step';
+    delBtn.style.cssText = 'position:absolute; top:-8px; left:-8px; width:18px; height:18px; line-height:15px; border-radius:50%; border:1px solid #c1182c; background:#fff; color:#c1182c; cursor:pointer; padding:0;';
+    delBtn.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    delBtn.addEventListener('click', (ev) => { ev.stopPropagation(); promptDeleteStep(n.id); });
+    el.appendChild(delBtn);
     // Drag the node body to MOVE it (B28); a click (no drag) selects/completes.
     el.addEventListener('mousedown', (ev) => {
-      if (ev.target.closest('.port') || ev.target.closest('.conn-del')) return;
+      if (ev.target.closest('.port') || ev.target.closest('.conn-del') || ev.target.closest('.node-delete')) return;
       ev.preventDefault();
       startNodeDrag(n.id, ev);
     });
@@ -445,6 +481,8 @@ async function inspectRun(runId) {
   }
   el.innerHTML = html;
 }
+$('#confirm-delete-yes').addEventListener('click', confirmDeleteStep);
+$('#confirm-delete-no').addEventListener('click', cancelDeleteStep);
 $('#btn-history').addEventListener('click', showHistory);
 $('#btn-history-close').addEventListener('click', () => { $('#history-panel').style.display = 'none'; });
 

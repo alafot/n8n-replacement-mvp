@@ -123,7 +123,8 @@ the true/false route), **drag a step to reposition** it (its connections follow
 and the position is saved), select a step to configure its parameters, **Save**
 the automation (stored durably), reopen it later (`/?def=<id>`), and **Run** it
 with a single click — watching each step's status update live and inspecting any
-step's output.
+step's output. **Delete** a step via the × on the node — it asks for
+confirmation first, and confirming removes the step and all its connections.
 
 Driven-browser checks (require Google Chrome installed; each writes screenshots
 to `SHOT_DIR` and exits non-zero on any failed assertion):
