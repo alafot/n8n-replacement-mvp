@@ -1,0 +1,4 @@
+.relay/
+node_modules/
+dist/
+*.log
