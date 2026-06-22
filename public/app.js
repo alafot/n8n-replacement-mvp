@@ -4,14 +4,15 @@
 //   POST/PUT/GET /definitions  - save/load durable definitions (B15, reusing B10)
 
 const STEP_TYPES = [
-  { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request' },
-  { type: 'transform', label: 'Reshape data', hint: 'Transform / Set' },
-  { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)' },
-  { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)' },
-  { type: 'filter', label: 'Keep matching items', hint: 'Filter' },
-  { type: 'code', label: 'Run a code snippet', hint: 'Code / Function' },
+  { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
+  { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
+  { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
+  { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
+  { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
+  { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
+const CATEGORY_ORDER = ['Actions', 'Transform', 'Flow', 'Code'];
 
 const state = {
   nodes: [], // { id, type, label, x, y, params }
@@ -482,18 +483,50 @@ async function run() {
 }
 
 // ---- wire up ----
+// Custom hover tooltip (shows the node's name + description on hover) — B33.
+const paletteTooltip = document.createElement('div');
+paletteTooltip.id = 'palette-tooltip';
+paletteTooltip.dataset.testid = 'palette-tooltip';
+paletteTooltip.style.display = 'none';
+document.body.appendChild(paletteTooltip);
+
+// Palette organised into categories with headings and compact icon buttons (B33).
 const palette = $('#palette');
-for (const st of STEP_TYPES) {
-  const btn = document.createElement('button');
-  btn.className = 'palette-item';
-  btn.dataset.testid = 'palette-item';
-  btn.dataset.stepType = st.type;
-  btn.innerHTML = st.label + '<span class="ptype">' + st.hint + ' · ' + st.type + '</span>';
-  // Click adds at an auto position (kept for no-regression, B30 E6).
-  btn.addEventListener('click', () => addNode(st.type));
-  // Drag a palette entry onto the canvas to drop it at a chosen location (B30).
-  btn.addEventListener('mousedown', (ev) => { state.paletteDrag = { type: st.type, startX: ev.clientX, startY: ev.clientY, moved: false }; });
-  palette.appendChild(btn);
+for (const cat of CATEGORY_ORDER) {
+  const inCat = STEP_TYPES.filter((s) => s.category === cat);
+  if (!inCat.length) continue;
+  const heading = document.createElement('div');
+  heading.className = 'palette-category';
+  heading.dataset.testid = 'palette-category';
+  heading.dataset.category = cat;
+  heading.textContent = cat;
+  palette.appendChild(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'palette-grid';
+  for (const st of inCat) {
+    const btn = document.createElement('button');
+    btn.className = 'palette-item';
+    btn.dataset.testid = 'palette-item';
+    btn.dataset.stepType = st.type;
+    btn.setAttribute('aria-label', st.label);
+    btn.innerHTML = '<span class="pi-icon" data-testid="palette-icon">' + st.icon + '</span><span class="pi-name">' + st.label + '</span>';
+    // Click adds at an auto position (kept for no-regression, B30 E6).
+    btn.addEventListener('click', () => addNode(st.type));
+    // Drag a palette entry onto the canvas to drop it at a chosen location (B30).
+    btn.addEventListener('mousedown', (ev) => { state.paletteDrag = { type: st.type, startX: ev.clientX, startY: ev.clientY, moved: false }; });
+    // Hover tooltip with name + description (B33 E3).
+    btn.addEventListener('mouseenter', () => {
+      paletteTooltip.innerHTML = '<strong data-testid="tooltip-name">' + st.label + '</strong><div data-testid="tooltip-desc">' + st.desc + '</div>';
+      const r = btn.getBoundingClientRect();
+      paletteTooltip.style.left = r.right + 8 + 'px';
+      paletteTooltip.style.top = r.top + 'px';
+      paletteTooltip.style.display = 'block';
+    });
+    btn.addEventListener('mouseleave', () => { paletteTooltip.style.display = 'none'; });
+    grid.appendChild(btn);
+  }
+  palette.appendChild(grid);
 }
 
 // Palette drag-and-drop: create a step at the DROP position on the canvas.

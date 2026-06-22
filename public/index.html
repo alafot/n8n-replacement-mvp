@@ -23,12 +23,21 @@
       .layout { flex: 1; display: flex; min-height: 0; }
       .palette { width: 220px; background: #fff; border-right: 1px solid #dfe2e8; padding: 14px; overflow-y: auto; }
       .palette h2, .inspector h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin: 0 0 10px; }
+      .palette-category { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: #8a93a2; font-weight: 700; margin: 12px 0 6px; }
+      .palette-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       .palette-item {
-        display: block; width: 100%; text-align: left; padding: 9px 11px; margin-bottom: 8px;
-        border: 1px solid #d4d8e0; border-radius: 8px; background: #fbfcfe; cursor: pointer; font-size: 13px;
+        display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px;
+        border: 1px solid #d4d8e0; border-radius: 8px; background: #fbfcfe; cursor: pointer;
       }
       .palette-item:hover { border-color: #4c6ef5; background: #eef2ff; }
-      .palette-item .ptype { display: block; font-size: 10px; color: #8a93a2; margin-top: 2px; font-family: ui-monospace, monospace; }
+      .palette-item .pi-icon { font-size: 18px; line-height: 1; }
+      .palette-item .pi-name { font-size: 10px; color: #45506a; text-align: center; line-height: 1.15; }
+      #palette-tooltip {
+        position: fixed; z-index: 60; max-width: 220px; padding: 8px 10px; border-radius: 8px;
+        background: #1f2430; color: #fff; font-size: 12px; box-shadow: 0 4px 14px rgba(20,30,50,0.25); pointer-events: none;
+      }
+      #palette-tooltip strong { display: block; margin-bottom: 2px; }
+      #palette-tooltip div { color: #c3cad6; }
       #canvas-wrap { flex: 1; position: relative; overflow: auto; }
       #canvas {
         position: relative; width: 1600px; height: 1200px;
