@@ -2,7 +2,7 @@
 // here, outside the deterministic workflow). Iteration 0 has one step: the
 // caller-configurable HTTP Request step (B2).
 
-import { Items, makeItem, BinaryDatum } from './itemFormat';
+import { Items, Item, makeItem, BinaryDatum } from './itemFormat';
 
 export interface HttpRequestInput {
   /** HTTP method; defaults to GET. */
@@ -84,4 +84,33 @@ export async function httpRequest(input: HttpRequestInput): Promise<Items> {
       binary,
     ),
   ];
+}
+
+export interface CodeStepInput {
+  /** JS body, executed with `$input` bound to the upstream items. Must return items. */
+  code: string;
+  /** The items received from the upstream node(s) — the data flowing in. */
+  input: Items;
+}
+
+/**
+ * Code/Transform step. Runs caller-supplied JavaScript over the items it
+ * receives from upstream and returns new items in the standard format. This is
+ * how a downstream node operates on the data produced by an upstream node.
+ */
+export async function runCode(args: CodeStepInput): Promise<Items> {
+  // `$input` is the upstream output; the code returns the node's items.
+  const fn = new Function('$input', args.code);
+  const produced = fn(args.input);
+
+  if (!Array.isArray(produced)) {
+    throw new Error('code step must return an array of items');
+  }
+
+  // Normalise to the standard item format ({ json, binary }).
+  return produced.map((it: any): Item => {
+    const json = it && typeof it.json === 'object' && it.json !== null ? it.json : { value: it };
+    const binary: Record<string, BinaryDatum> = it && typeof it.binary === 'object' && it.binary !== null ? it.binary : {};
+    return makeItem(json, binary);
+  });
 }

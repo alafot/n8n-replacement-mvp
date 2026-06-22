@@ -53,6 +53,16 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Returns a caller-chosen numeric value — lets a graph demo prove data flow
+  // with an arbitrary (non-constant) value picked at trigger time.
+  const valueMatch = path.match(/^\/value\/(\d+)$/);
+  if (valueMatch) {
+    const n = Number(valueMatch[1]);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ value: n, label: `server-value-${n}` }));
+    return;
+  }
+
   const delayMatch = path.match(/^\/delay\/(\d+)$/);
   if (delayMatch) {
     const ms = Number(delayMatch[1]);

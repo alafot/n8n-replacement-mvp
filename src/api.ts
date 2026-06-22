@@ -8,8 +8,9 @@
 
 import Fastify from 'fastify';
 import { Client, Connection } from '@temporalio/client';
-import { runHttpRequest } from './workflows';
+import { runHttpRequest, runGraph } from './workflows';
 import type { HttpRequestInput } from './activities';
+import type { GraphDefinition } from './graph';
 import type { Items } from './itemFormat';
 import { ADDRESS, NAMESPACE, TASK_QUEUE } from './temporal';
 
@@ -59,6 +60,27 @@ async function main(): Promise<void> {
       taskQueue: TASK_QUEUE,
       workflowId: runId,
       args: [input],
+    });
+
+    return reply.code(202).send({
+      runId: handle.workflowId,
+      temporalRunId: handle.firstExecutionRunId,
+      status: 'in-progress',
+    });
+  });
+
+  // --- B6: trigger a multi-step GRAPH run, return a handle promptly. ---
+  app.post('/workflows/run-graph', async (request, reply) => {
+    const def = (request.body ?? {}) as GraphDefinition;
+    if (!Array.isArray(def.nodes) || !def.nodes.length) {
+      return reply.code(400).send({ error: 'graph definition must include a non-empty nodes array' });
+    }
+
+    const runId = `run-${randomId()}`;
+    const handle = await client.workflow.start(runGraph, {
+      taskQueue: TASK_QUEUE,
+      workflowId: runId,
+      args: [def],
     });
 
     return reply.code(202).send({
