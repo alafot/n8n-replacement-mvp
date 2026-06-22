@@ -7,9 +7,11 @@
   "scripts": {
     "worker": "ts-node src/worker.ts",
     "api": "ts-node src/api.ts",
-    "test-endpoint": "node scripts/test-endpoint.mjs"
+    "test-endpoint": "node scripts/test-endpoint.mjs",
+    "e2e:canvas": "node e2e/canvas.mjs"
   },
   "dependencies": {
+    "@fastify/static": "^8.3.0",
     "@temporalio/activity": "^1.11.8",
     "@temporalio/client": "^1.11.8",
     "@temporalio/worker": "^1.11.8",
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.9.0",
+    "playwright": "^1.61.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
   }

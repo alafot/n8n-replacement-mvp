@@ -7,6 +7,8 @@
 //                           success or error info on failure (B5).
 
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
+import * as path from 'path';
 import { Client, Connection } from '@temporalio/client';
 import { runHttpRequest, runGraph } from './workflows';
 import type { HttpRequestInput } from './activities';
@@ -206,6 +208,12 @@ async function main(): Promise<void> {
   });
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));
+
+  // --- B12: serve the visual canvas (static frontend) at '/'. ---
+  await app.register(fastifyStatic, {
+    root: path.join(process.cwd(), 'public'),
+    prefix: '/',
+  });
 
   await app.listen({ port: PORT, host: '127.0.0.1' });
   console.log(`[api] listening on http://127.0.0.1:${PORT} (temporal=${ADDRESS}, namespace='${NAMESPACE}', queue='${TASK_QUEUE}')`);

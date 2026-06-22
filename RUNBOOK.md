@@ -104,6 +104,28 @@ temporal workflow describe -w <runId>
 
 …or in the Web UI at <http://localhost:8233>.
 
+## Visual canvas (Iteration 2)
+
+With the API running (Step 4), open the workflow builder in a browser:
+
+```
+open http://127.0.0.1:3000/
+```
+
+The left palette lists the available step types (Call a web service, Reshape
+data, Branch on a condition, Run a code snippet); clicking one places a step of
+the matching engine type on the canvas.
+
+Driven-browser check (loads the page in Chrome, adds one of each type, asserts
+the placed nodes match):
+
+```
+SHOT_DIR=/tmp npm run e2e:canvas
+```
+
+It writes `canvas-empty.png` and `canvas-four-nodes.png` to `SHOT_DIR` and exits
+non-zero on any failed assertion. Requires Google Chrome installed.
+
 ## Configuration
 
 - `TEMPORAL_ADDRESS` (default `localhost:7233`)

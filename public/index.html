@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workflow Builder</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f4f5f7;
+        color: #1f2430;
+      }
+      header {
+        padding: 12px 18px;
+        background: #1f2430;
+        color: #fff;
+        font-weight: 600;
+      }
+      .layout { flex: 1; display: flex; min-height: 0; }
+      .palette {
+        width: 240px;
+        background: #fff;
+        border-right: 1px solid #dfe2e8;
+        padding: 14px;
+        overflow-y: auto;
+      }
+      .palette h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6b7280;
+        margin: 0 0 10px;
+      }
+      .palette-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        border: 1px solid #d4d8e0;
+        border-radius: 8px;
+        background: #fbfcfe;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .palette-item:hover { border-color: #4c6ef5; background: #eef2ff; }
+      .palette-item .ptype { display: block; font-size: 11px; color: #8a93a2; margin-top: 2px; }
+      #canvas {
+        flex: 1;
+        position: relative;
+        overflow: auto;
+        background:
+          radial-gradient(circle, #d7dbe2 1px, transparent 1px) 0 0 / 22px 22px;
+      }
+      #canvas-empty {
+        position: absolute; inset: 0;
+        display: flex; align-items: center; justify-content: center;
+        color: #98a1b0; font-size: 15px; pointer-events: none;
+      }
+      .node {
+        position: absolute;
+        width: 180px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #fff;
+        border: 1px solid #c7ccd6;
+        box-shadow: 0 2px 6px rgba(20, 30, 50, 0.08);
+        font-size: 13px;
+      }
+      .node .node-title { font-weight: 600; }
+      .node .node-type { font-size: 11px; color: #6b7280; margin-top: 3px; font-family: ui-monospace, monospace; }
+      .node[data-node-type='httpRequest'] { border-top: 3px solid #4c6ef5; }
+      .node[data-node-type='transform']   { border-top: 3px solid #12b886; }
+      .node[data-node-type='if']          { border-top: 3px solid #f59f00; }
+      .node[data-node-type='code']        { border-top: 3px solid #ae3ec9; }
+    </style>
+  </head>
+  <body>
+    <header>Workflow Builder — Iteration 2</header>
+    <div class="layout">
+      <aside class="palette">
+        <h2>Step palette</h2>
+        <div id="palette"></div>
+      </aside>
+      <main id="canvas" data-testid="canvas">
+        <div id="canvas-empty">Click a step in the palette to add it to the canvas</div>
+      </main>
+    </div>
+
+    <script>
+      // The palette's step types correspond to the engine's REAL implemented
+      // step types (httpRequest, transform, if, code) — the same `type` values
+      // the workflow graph/interpreter uses.
+      const STEP_TYPES = [
+        { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request' },
+        { type: 'transform',   label: 'Reshape data',       hint: 'Transform / Set' },
+        { type: 'if',          label: 'Branch on a condition', hint: 'Conditional (IF)' },
+        { type: 'code',        label: 'Run a code snippet',  hint: 'Code / Function' },
+      ];
+
+      const palette = document.getElementById('palette');
+      const canvas = document.getElementById('canvas');
+      const emptyHint = document.getElementById('canvas-empty');
+      let placed = 0;
+
+      function placeNode(stepType, label) {
+        emptyHint.style.display = 'none';
+        const node = document.createElement('div');
+        node.className = 'node';
+        node.dataset.nodeType = stepType;          // <-- type of the PLACED step
+        node.dataset.testid = 'node';
+        const col = placed % 3;
+        const row = Math.floor(placed / 3);
+        node.style.left = 40 + col * 210 + 'px';
+        node.style.top = 40 + row * 90 + 'px';
+        node.innerHTML =
+          '<div class="node-title">' + label + '</div>' +
+          '<div class="node-type">type: ' + stepType + '</div>';
+        canvas.appendChild(node);
+        placed += 1;
+      }
+
+      for (const st of STEP_TYPES) {
+        const btn = document.createElement('button');
+        btn.className = 'palette-item';
+        btn.dataset.stepType = st.type;            // <-- type offered by the palette
+        btn.dataset.testid = 'palette-item';
+        btn.innerHTML = st.label + '<span class="ptype">' + st.hint + ' · ' + st.type + '</span>';
+        btn.addEventListener('click', () => placeNode(st.type, st.label));
+        palette.appendChild(btn);
+      }
+    </script>
+  </body>
+</html>
