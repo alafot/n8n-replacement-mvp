@@ -138,12 +138,32 @@ export function exportToN8n(name: string, graph: GraphDefinition): N8nExport {
     connections[fromName].main[outIdx].push({ node: toName, type: 'main', index: 0 });
   }
 
+  // n8n persists a workflow record keyed by a top-level id; real exports also
+  // carry versionId/meta. Derive them deterministically from the content.
+  const wfId = idFromString(name + ':' + graph.nodes.map((n) => n.id).join(','));
+  const versionId = idFromString('v:' + wfId);
+
   return {
+    id: wfId,
     name,
     nodes,
     connections,
     active: false,
     settings: { executionOrder: 'v1' },
+    versionId,
+    meta: { instanceId: idFromString('i:' + wfId) },
     pinData: {},
   } as N8nExport & Record<string, unknown>;
+}
+
+/** Deterministic 16-char alphanumeric id (n8n accepts string workflow ids). */
+function idFromString(s: string): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let out = '';
+  let h = hash(s) >>> 0;
+  for (let i = 0; i < 16; i++) {
+    h = (h * 1103515245 + 12345) >>> 0;
+    out += alphabet[h % alphabet.length];
+  }
+  return out;
 }
