@@ -22,7 +22,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 9 | Aggregate | ✅ satisfied | seed(amount 10,20,30) → Aggregate ⇒ one item {amounts:[10,20,30]} | `aggregate/aggregate-success.png` |
 | 10 | Split Out | ✅ satisfied | seed{tags:[a,b,c]} → Split Out ⇒ 3 items (a/b/c) | `split-out/split-out-success.png` |
 | 11 | Sort | ✅ satisfied | seed[3,1,2,1] → Sort(asc) ⇒ [1,1,2,3] | `sort/sort-success.png` |
-| 12 | Limit | _pending_ | — | — |
+| 12 | Limit | ✅ satisfied | seed(5 items) → Limit(max 2, first) ⇒ [1,2] | `limit/limit-success.png` |
 | 13 | Remove Duplicates | _pending_ | — | — |
 | 14 | Rename Keys | _pending_ | — | — |
 | 15 | Date & Time | _pending_ | — | — |
@@ -103,3 +103,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: items emerged ascending `[1,1,2,3]` — same set and count preserved including the duplicate, nothing dropped/added — and downstream received all 4 in sorted order. (Examiner also confirmed Descending → `[3,2,1,1]`.)
 - Screenshot: `sort/sort-success.png`. Demo: `sort/demo.mjs`.
 - Assumptions: demoed ascending on a numeric field; direction selector also offers descending.
+
+### Node 12 — Limit ✅
+- Sample: seed (5 items, `n` 1..5) → **Limit** (max 2, keep first) → sink. Ran on the real engine; run **completed**.
+- Verified: only **2** items continued downstream — the first two (`n:1, n:2`) in order. (Examiner also confirmed keep-last keeps the last 2, and that fewer-than-N items all pass through unchanged.)
+- Screenshot: `limit/limit-success.png`. Demo: `limit/demo.mjs`.
+- Assumptions: demoed keep-first with max 2; the node also offers keep-last.

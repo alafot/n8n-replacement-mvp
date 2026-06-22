@@ -10,6 +10,7 @@ const STEP_TYPES = [
   { type: 'splitOut', label: 'Split out', hint: 'Split Out', category: 'Transform', icon: '✂️', desc: 'Expand an item\'s list field into multiple items, one per element.' },
   { type: 'sort', label: 'Sort', hint: 'Sort', category: 'Transform', icon: '↕️', desc: 'Reorder items by a chosen field, ascending or descending.' },
   { type: 'limit', label: 'Limit', hint: 'Limit', category: 'Transform', icon: '🔢', desc: 'Cap how many items pass through, keeping at most N.' },
+  { type: 'removeDuplicates', label: 'Remove duplicates', hint: 'Remove Duplicates', category: 'Transform', icon: '🧹', desc: 'Drop duplicate items, keeping only the distinct ones.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -55,6 +56,7 @@ function defaultParams(type) {
   if (type === 'splitOut') return { field: 'json.values', outputName: 'value' };
   if (type === 'sort') return { field: 'json.value', direction: 'asc' };
   if (type === 'limit') return { max: 1, keep: 'first' };
+  if (type === 'removeDuplicates') return { by: 'field', field: 'json.id' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -512,6 +514,14 @@ function renderConfig() {
     for (const k of ['first', 'last']) { const o = document.createElement('option'); o.value = k; o.textContent = k === 'first' ? 'Keep first N' : 'Keep last N'; if (n.params.keep === k) o.selected = true; sel.appendChild(o); }
     sel.addEventListener('change', () => { n.params.keep = sel.value; });
     c.appendChild(field('Keep', 'cfg-limit-keep', sel));
+  } else if (n.type === 'removeDuplicates') {
+    n.params.by = n.params.by ?? 'field';
+    n.params.field = n.params.field ?? 'json.id';
+    const sel = document.createElement('select');
+    for (const b of ['field', 'whole']) { const o = document.createElement('option'); o.value = b; o.textContent = b === 'field' ? 'By key field' : 'Whole item'; if (n.params.by === b) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.by = sel.value; });
+    c.appendChild(field('Compare', 'cfg-dedup-by', sel));
+    c.appendChild(field('Key field (path, when "By key field")', 'cfg-dedup-field', input(n.params.field, (v) => (n.params.field = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

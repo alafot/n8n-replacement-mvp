@@ -159,6 +159,19 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       if (input.length <= max) return { main: input };
       return { main: keepLast ? input.slice(input.length - max) : input.slice(0, max) };
     }
+    case 'removeDuplicates': {
+      // Keep only distinct items (first occurrence, original order). Identity is
+      // a chosen key field, or the whole item.
+      const byWhole = (node.params as any).by === 'whole';
+      const field = String((node.params as any).field ?? 'json.id');
+      const seen = new Set<string>();
+      const out: Items = [];
+      for (const it of input) {
+        const key = byWhole ? JSON.stringify(it.json) : JSON.stringify(getPath(it, field));
+        if (!seen.has(key)) { seen.add(key); out.push(it); }
+      }
+      return { main: out };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };
