@@ -4,7 +4,7 @@
 // HTTP-request step and returns its output as the run's result, in the
 // standard item format.
 
-import { proxyActivities, defineQuery, setHandler, sleep } from '@temporalio/workflow';
+import { proxyActivities, defineQuery, setHandler, sleep, ApplicationFailure } from '@temporalio/workflow';
 import type * as activities from './activities';
 import type { HttpRequestInput } from './activities';
 import type { Items } from './itemFormat';
@@ -122,6 +122,11 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };
+    case 'stopError':
+      // Deliberately FAIL the run execution with the user's message (a
+      // non-retryable ApplicationFailure, so it ends the run rather than
+      // retrying a workflow task), aborting downstream.
+      throw ApplicationFailure.create({ message: String((node.params as any).message ?? 'Stopped with error'), nonRetryable: true });
     case 'wait': {
       // Pause the run for the configured time (durable timer), then pass the
       // items through UNCHANGED.

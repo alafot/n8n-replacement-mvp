@@ -124,7 +124,9 @@ Items step iterates its input in batches (configurable batch size): the loop-bod
 output runs once per batch, and the done output runs once after the final batch
 with the accumulated results. The Wait step pauses the run for a configured
 duration (durable timer), then passes its items through unchanged. The No
-Operation step is a true pass-through (items go straight through unchanged).
+Operation step is a true pass-through (items go straight through unchanged). The
+Stop and Error step deliberately fails the run with a custom message when
+reached, aborting downstream.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

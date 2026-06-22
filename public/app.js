@@ -13,6 +13,7 @@ const STEP_TYPES = [
   { type: 'loop', label: 'Loop over items', hint: 'Loop (batches)', category: 'Flow', icon: '🔁', desc: 'Iterate items in batches: run the loop body once per batch, then continue on the done output.' },
   { type: 'wait', label: 'Wait', hint: 'Pause', category: 'Flow', icon: '⏱️', desc: 'Pause the run for a configured time, then pass items through unchanged.' },
   { type: 'noop', label: 'No operation', hint: 'No-Op', category: 'Flow', icon: '➡️', desc: 'A no-op: passes items straight through unchanged.' },
+  { type: 'stopError', label: 'Stop and error', hint: 'Stop And Error', category: 'Flow', icon: '🛑', desc: 'Deliberately fail the run with a custom error message, aborting downstream.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -47,6 +48,7 @@ function defaultParams(type) {
   if (type === 'merge') return { mode: 'append' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
+  if (type === 'stopError') return { message: 'Stopped with error' };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -452,6 +454,11 @@ function renderConfig() {
   } else if (n.type === 'noop') {
     const note = document.createElement('div'); note.dataset.testid = 'cfg-noop-note'; note.style.cssText = 'font-size:12px;color:#6b7280;'; note.textContent = 'No configuration — passes items through unchanged.';
     c.appendChild(note);
+  } else if (n.type === 'stopError') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Fails the run with this message when reached; downstream does not run.';
+    c.appendChild(note);
+    n.params.message = n.params.message ?? 'Stopped with error';
+    c.appendChild(field('Error message', 'cfg-error-message', input(n.params.message, (v) => (n.params.message = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }
@@ -511,7 +518,14 @@ async function run() {
     render();
     if (s.status !== 'in-progress') {
       clearInterval(state.poll); state.poll = null;
-      $('#run-status').textContent = res.runId + ' → ' + s.status;
+      let text = res.runId + ' → ' + s.status;
+      if (s.status === 'failed') {
+        // Surface the failure message to the user (e.g. a Stop and Error message).
+        const failed = Object.values(s.steps).find((st) => st.status === 'failed' && st.error);
+        const msg = failed ? failed.error : '';
+        if (msg) { text += ': ' + msg; $('#run-status').dataset.errorMessage = msg; }
+      }
+      $('#run-status').textContent = text;
       $('#run-status').dataset.runState = s.status;
     }
   }, 250);

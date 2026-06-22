@@ -16,7 +16,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 3 | Merge | ✅ satisfied | 2 branches (A:2 items + B:1) → Merge(append) → sink | `merge/merge-success.png` |
 | 4 | Loop Over Items | ✅ satisfied | seed(3 items) → Loop(batch 1) → body / done | `loop-over-items/loop-success.png` |
 | 5 | Wait | ✅ satisfied | seed → Wait(2500ms) → sink; measured 2807ms pause | `wait/wait-pausing.png`, `wait/wait-success.png` |
-| 6 | No Operation | _pending_ | — | — |
+| 6 | No Operation | ✅ satisfied | seed([3,1,1,2] unsorted+dup) → No-Op → sink | `no-operation/noop-success.png` |
 | 7 | Stop and Error | _pending_ | — | — |
 | 8 | Execute Sub-workflow | _pending_ | — | — |
 | 9 | Aggregate | _pending_ | — | — |
@@ -63,3 +63,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the run genuinely **paused** at the Wait — measured wall-time **2807 ms** for the configured 2500 ms (not instantaneous) — and the mid-run screenshot shows seed `completed`, Wait `running`, downstream `pending` while it pauses. Items passed through unchanged (`{token:X, n:7}` in == out). Run completed after the wait elapsed.
 - Screenshots: `wait/wait-pausing.png` (the pause in action), `wait/wait-success.png` (completed). Demo: `wait/demo.mjs`.
 - Assumptions: duration entered in milliseconds (the node's unit); demoed 2500 ms.
+
+### Node 6 — No Operation ✅
+- Sample workflow: seed (deliberately unsorted + with a duplicate: ids `[3,1,1,2]`) → **No Operation** → sink. Ran on the real engine; run **completed**.
+- Verified: the No-Op output was identical to its input and the downstream step received the same items unchanged — `[3,1,1,2]` with order and the duplicate preserved (nothing reordered/deduped/added/removed). Screenshot shows the completed run with the No-Op inspector output.
+- Screenshot: `no-operation/noop-success.png`. Demo: `no-operation/demo.mjs`.
+- Assumptions: none (the node has no configuration).
