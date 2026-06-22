@@ -7,133 +7,101 @@
     <style>
       * { box-sizing: border-box; }
       body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f4f5f7;
-        color: #1f2430;
+        margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        height: 100vh; display: flex; flex-direction: column; background: #f4f5f7; color: #1f2430;
       }
       header {
-        padding: 12px 18px;
-        background: #1f2430;
-        color: #fff;
-        font-weight: 600;
+        padding: 10px 16px; background: #1f2430; color: #fff; display: flex; align-items: center; gap: 12px;
       }
+      header .title { font-weight: 600; }
+      header input { padding: 5px 8px; border-radius: 6px; border: 1px solid #3a4150; background: #2a3140; color: #fff; }
+      header button {
+        padding: 6px 12px; border-radius: 6px; border: 1px solid #3a4150; background: #3b4a63; color: #fff; cursor: pointer; font-size: 13px;
+      }
+      header button#btn-run { background: #2f9e44; border-color: #2b8a3e; }
+      header .status { margin-left: auto; font-size: 12px; color: #aeb7c4; }
       .layout { flex: 1; display: flex; min-height: 0; }
-      .palette {
-        width: 240px;
-        background: #fff;
-        border-right: 1px solid #dfe2e8;
-        padding: 14px;
-        overflow-y: auto;
-      }
-      .palette h2 {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #6b7280;
-        margin: 0 0 10px;
-      }
+      .palette { width: 220px; background: #fff; border-right: 1px solid #dfe2e8; padding: 14px; overflow-y: auto; }
+      .palette h2, .inspector h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin: 0 0 10px; }
       .palette-item {
-        display: block;
-        width: 100%;
-        text-align: left;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        border: 1px solid #d4d8e0;
-        border-radius: 8px;
-        background: #fbfcfe;
-        cursor: pointer;
-        font-size: 14px;
+        display: block; width: 100%; text-align: left; padding: 9px 11px; margin-bottom: 8px;
+        border: 1px solid #d4d8e0; border-radius: 8px; background: #fbfcfe; cursor: pointer; font-size: 13px;
       }
       .palette-item:hover { border-color: #4c6ef5; background: #eef2ff; }
-      .palette-item .ptype { display: block; font-size: 11px; color: #8a93a2; margin-top: 2px; }
+      .palette-item .ptype { display: block; font-size: 10px; color: #8a93a2; margin-top: 2px; font-family: ui-monospace, monospace; }
+      #canvas-wrap { flex: 1; position: relative; overflow: auto; }
       #canvas {
-        flex: 1;
-        position: relative;
-        overflow: auto;
-        background:
-          radial-gradient(circle, #d7dbe2 1px, transparent 1px) 0 0 / 22px 22px;
+        position: relative; width: 1600px; height: 1200px;
+        background: radial-gradient(circle, #d7dbe2 1px, transparent 1px) 0 0 / 22px 22px;
       }
-      #canvas-empty {
-        position: absolute; inset: 0;
-        display: flex; align-items: center; justify-content: center;
-        color: #98a1b0; font-size: 15px; pointer-events: none;
+      #links { position: absolute; inset: 0; pointer-events: none; }
+      #links line { stroke: #7c8696; stroke-width: 2; }
+      .conn-del {
+        position: absolute; transform: translate(-50%, -50%); width: 18px; height: 18px; line-height: 16px;
+        text-align: center; border-radius: 50%; background: #fff; border: 1px solid #c1182c; color: #c1182c;
+        font-size: 12px; cursor: pointer; padding: 0;
       }
       .node {
-        position: absolute;
-        width: 180px;
-        padding: 10px 12px;
-        border-radius: 10px;
-        background: #fff;
-        border: 1px solid #c7ccd6;
-        box-shadow: 0 2px 6px rgba(20, 30, 50, 0.08);
-        font-size: 13px;
+        position: absolute; width: 170px; padding: 9px 11px; border-radius: 10px; background: #fff;
+        border: 1px solid #c7ccd6; box-shadow: 0 2px 6px rgba(20, 30, 50, 0.08); font-size: 13px; cursor: pointer;
       }
+      .node.selected { outline: 2px solid #4c6ef5; }
       .node .node-title { font-weight: 600; }
-      .node .node-type { font-size: 11px; color: #6b7280; margin-top: 3px; font-family: ui-monospace, monospace; }
+      .node .node-type { font-size: 10px; color: #6b7280; margin-top: 2px; font-family: ui-monospace, monospace; }
       .node[data-node-type='httpRequest'] { border-top: 3px solid #4c6ef5; }
       .node[data-node-type='transform']   { border-top: 3px solid #12b886; }
       .node[data-node-type='if']          { border-top: 3px solid #f59f00; }
       .node[data-node-type='code']        { border-top: 3px solid #ae3ec9; }
+      .node[data-step-status='running']   { box-shadow: 0 0 0 3px #ffd43b; }
+      .node[data-step-status='completed'] { box-shadow: 0 0 0 3px #40c057; }
+      .node[data-step-status='failed']    { box-shadow: 0 0 0 3px #fa5252; }
+      .node[data-step-status='skipped']   { opacity: 0.5; box-shadow: 0 0 0 3px #adb5bd; }
+      .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #eceff3; margin-top: 4px; }
+      .ports { position: absolute; right: -9px; top: 0; display: flex; flex-direction: column; gap: 3px; }
+      .port {
+        width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; font-size: 8px;
+        color: #fff; text-align: center; line-height: 12px;
+      }
+      .port[data-port='main']  { background: #495057; }
+      .port[data-port='true']  { background: #2f9e44; }
+      .port[data-port='false'] { background: #e8590c; }
+      .port.armed { outline: 2px solid #4c6ef5; }
+      .inspector { width: 300px; background: #fff; border-left: 1px solid #dfe2e8; padding: 14px; overflow-y: auto; }
+      .inspector label { display: block; font-size: 12px; color: #45506280; margin: 8px 0 3px; font-weight: 600; }
+      .inspector input, .inspector select, .inspector textarea {
+        width: 100%; padding: 6px 8px; border: 1px solid #ccd2dc; border-radius: 6px; font-size: 13px; font-family: inherit;
+      }
+      .inspector textarea { font-family: ui-monospace, monospace; min-height: 60px; }
+      pre#step-output { background: #f1f3f5; padding: 8px; border-radius: 6px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; }
+      .hint { color: #98a1b0; font-size: 13px; }
     </style>
   </head>
   <body>
-    <header>Workflow Builder — Iteration 2</header>
+    <header>
+      <span class="title">Workflow Builder</span>
+      <input id="automation-name" data-testid="automation-name" value="My automation" />
+      <button id="btn-new" data-testid="btn-new">New</button>
+      <button id="btn-save" data-testid="btn-save">Save</button>
+      <button id="btn-load" data-testid="btn-load">Load…</button>
+      <button id="btn-run" data-testid="btn-run">▶ Run</button>
+      <span class="status" id="run-status" data-testid="run-status"></span>
+    </header>
     <div class="layout">
       <aside class="palette">
         <h2>Step palette</h2>
         <div id="palette"></div>
+        <p class="hint" id="connect-hint" data-testid="connect-hint" style="margin-top:14px"></p>
       </aside>
-      <main id="canvas" data-testid="canvas">
-        <div id="canvas-empty">Click a step in the palette to add it to the canvas</div>
-      </main>
+      <div id="canvas-wrap">
+        <div id="canvas" data-testid="canvas">
+          <svg id="links"></svg>
+        </div>
+      </div>
+      <aside class="inspector">
+        <h2>Inspector</h2>
+        <div id="config" data-testid="config"><p class="hint">Select a step to configure it.</p></div>
+      </aside>
     </div>
-
-    <script>
-      // The palette's step types correspond to the engine's REAL implemented
-      // step types (httpRequest, transform, if, code) — the same `type` values
-      // the workflow graph/interpreter uses.
-      const STEP_TYPES = [
-        { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request' },
-        { type: 'transform',   label: 'Reshape data',       hint: 'Transform / Set' },
-        { type: 'if',          label: 'Branch on a condition', hint: 'Conditional (IF)' },
-        { type: 'code',        label: 'Run a code snippet',  hint: 'Code / Function' },
-      ];
-
-      const palette = document.getElementById('palette');
-      const canvas = document.getElementById('canvas');
-      const emptyHint = document.getElementById('canvas-empty');
-      let placed = 0;
-
-      function placeNode(stepType, label) {
-        emptyHint.style.display = 'none';
-        const node = document.createElement('div');
-        node.className = 'node';
-        node.dataset.nodeType = stepType;          // <-- type of the PLACED step
-        node.dataset.testid = 'node';
-        const col = placed % 3;
-        const row = Math.floor(placed / 3);
-        node.style.left = 40 + col * 210 + 'px';
-        node.style.top = 40 + row * 90 + 'px';
-        node.innerHTML =
-          '<div class="node-title">' + label + '</div>' +
-          '<div class="node-type">type: ' + stepType + '</div>';
-        canvas.appendChild(node);
-        placed += 1;
-      }
-
-      for (const st of STEP_TYPES) {
-        const btn = document.createElement('button');
-        btn.className = 'palette-item';
-        btn.dataset.stepType = st.type;            // <-- type offered by the palette
-        btn.dataset.testid = 'palette-item';
-        btn.innerHTML = st.label + '<span class="ptype">' + st.hint + ' · ' + st.type + '</span>';
-        btn.addEventListener('click', () => placeNode(st.type, st.label));
-        palette.appendChild(btn);
-      }
-    </script>
+    <script src="/app.js"></script>
   </body>
 </html>

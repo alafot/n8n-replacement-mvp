@@ -4,7 +4,7 @@
 // HTTP-request step and returns its output as the run's result, in the
 // standard item format.
 
-import { proxyActivities } from '@temporalio/workflow';
+import { proxyActivities, defineQuery, setHandler } from '@temporalio/workflow';
 import type * as activities from './activities';
 import type { HttpRequestInput } from './activities';
 import type { Items } from './itemFormat';
@@ -14,6 +14,19 @@ import {
   topologicalOrder,
   evaluateCondition,
 } from './graph';
+
+export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+export interface StepState {
+  status: StepStatus;
+  /** Output items the step produced, in the standard item format. */
+  output?: Items;
+  /** Error description when the step failed. */
+  error?: string;
+}
+
+/** Per-step status/output of a run, keyed by node id (B17). Queryable live. */
+export const getStepsQuery = defineQuery<Record<string, StepState>>('getSteps');
 
 const { httpRequest, runCode, runTransform } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
@@ -52,6 +65,11 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
   const order = topologicalOrder(def);
   const outputs: Record<string, Items> = {};
 
+  // Per-step state, exposed via query so callers can watch progress live (B17).
+  const steps: Record<string, StepState> = {};
+  for (const n of def.nodes) steps[n.id] = { status: 'pending' };
+  setHandler(getStepsQuery, () => steps);
+
   // A node executes only if it is "active": a root (no incoming edges) or
   // reached by a taken edge from an active node.
   const hasIncoming = new Set(def.connections.map((c) => c.to));
@@ -68,29 +86,37 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
       if (c.to === nodeId && takenEdges.has(i)) input.push(...(outputs[c.from] ?? []));
     });
 
+    steps[nodeId].status = 'running'; // observable as 'running' while awaited
+
     let out: Items;
     let decision: boolean | null = null;
-    switch (node.type) {
-      case 'httpRequest':
-        out = await httpRequest(node.params as unknown as HttpRequestInput);
-        break;
-      case 'code':
-        out = await runCode({ code: String(node.params.code ?? ''), input });
-        break;
-      case 'transform':
-        out = await runTransform({ config: node.params as any, input });
-        break;
-      case 'if': {
-        // Pure decision over the incoming items; passes items through so the
-        // chosen branch receives the same data.
-        decision = evaluateCondition(node.params.condition as Condition, input[0]);
-        out = input;
-        break;
+    try {
+      switch (node.type) {
+        case 'httpRequest':
+          out = await httpRequest(node.params as unknown as HttpRequestInput);
+          break;
+        case 'code':
+          out = await runCode({ code: String(node.params.code ?? ''), input });
+          break;
+        case 'transform':
+          out = await runTransform({ config: node.params as any, input });
+          break;
+        case 'if': {
+          // Pure decision over the incoming items; passes items through so the
+          // chosen branch receives the same data.
+          decision = evaluateCondition(node.params.condition as Condition, input[0]);
+          out = input;
+          break;
+        }
+        default:
+          throw new Error(`unknown node type '${(node as any).type}'`);
       }
-      default:
-        throw new Error(`unknown node type '${(node as any).type}'`);
+    } catch (err: any) {
+      steps[nodeId] = { status: 'failed', error: String(err?.message ?? err) };
+      throw err;
     }
     outputs[nodeId] = out;
+    steps[nodeId] = { status: 'completed', output: out };
 
     // Mark which outgoing edges are taken, activating their targets.
     def.connections.forEach((c, i) => {
@@ -102,6 +128,15 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
         active.add(c.to);
       }
     });
+  }
+
+  // Steps on a not-taken branch report 'skipped' (distinct from failed/completed).
+  for (const nodeId of order) {
+    if (active.has(nodeId)) continue;
+    const ups = def.connections.filter((c) => c.to === nodeId).map((c) => c.from);
+    if (ups.some((u) => steps[u].status === 'completed' || steps[u].status === 'skipped')) {
+      steps[nodeId].status = 'skipped';
+    }
   }
 
   // Overall result = the last executed node in dependency order (terminal of

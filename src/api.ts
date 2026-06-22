@@ -10,7 +10,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import * as path from 'path';
 import { Client, Connection } from '@temporalio/client';
-import { runHttpRequest, runGraph } from './workflows';
+import { runHttpRequest, runGraph, getStepsQuery } from './workflows';
 import type { HttpRequestInput } from './activities';
 import type { GraphDefinition } from './graph';
 import {
@@ -205,6 +205,21 @@ async function main(): Promise<void> {
       definitionId: def.id,
       status: 'in-progress',
     });
+  });
+
+  // --- B17: per-step status & output for a run, observable during and after. ---
+  app.get<{ Params: { id: string } }>('/runs/:id/steps', async (request, reply) => {
+    const { id } = request.params;
+    const handle = client.workflow.getHandle(id);
+    let description;
+    try {
+      description = await handle.describe();
+    } catch (err: any) {
+      return reply.code(404).send({ runId: id, error: `no such run: ${err?.message ?? err}` });
+    }
+    // Query the (running or closed) run for its per-step state.
+    const steps = await handle.query(getStepsQuery);
+    return reply.send({ runId: id, status: toRunStatus(description.status.name), steps });
   });
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));

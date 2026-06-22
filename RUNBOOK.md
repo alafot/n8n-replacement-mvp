@@ -116,15 +116,20 @@ The left palette lists the available step types (Call a web service, Reshape
 data, Branch on a condition, Run a code snippet); clicking one places a step of
 the matching engine type on the canvas.
 
-Driven-browser check (loads the page in Chrome, adds one of each type, asserts
-the placed nodes match):
+From the canvas you can: add steps from the palette, wire them together
+(including a branch step's true/false ports to distinct downstream steps),
+select a step to configure its parameters, **Save** the automation (stored
+durably), reopen it later (`/?def=<id>`), and **Run** it with a single click —
+watching each step's status update live and inspecting any step's output.
+
+Driven-browser checks (require Google Chrome installed; each writes screenshots
+to `SHOT_DIR` and exits non-zero on any failed assertion):
 
 ```
-SHOT_DIR=/tmp npm run e2e:canvas
+SHOT_DIR=/tmp npm run e2e:canvas    # canvas loads; palette places matching steps
+SHOT_DIR=/tmp npm run e2e:builder   # connect/disconnect, branch ports, config, save & reload in a fresh session
+SHOT_DIR=/tmp npm run e2e:run       # run from canvas; live status; skipped branch; inspect output
 ```
-
-It writes `canvas-empty.png` and `canvas-four-nodes.png` to `SHOT_DIR` and exits
-non-zero on any failed assertion. Requires Google Chrome installed.
 
 ## Configuration
 
