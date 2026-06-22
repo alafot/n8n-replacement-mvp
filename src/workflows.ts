@@ -19,10 +19,25 @@ export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipp
 
 export interface StepState {
   status: StepStatus;
+  /** Items the step received from upstream, in the standard item format. */
+  input?: Items;
   /** Output items the step produced, in the standard item format. */
   output?: Items;
-  /** Error description when the step failed. */
+  /** Real underlying error cause when the step failed. */
   error?: string;
+}
+
+/** Deepest (most specific) message in an error's cause chain. */
+function deepestCause(err: any): string {
+  let cur = err;
+  let msg = String(err?.message ?? err);
+  const seen = new Set<unknown>();
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    if (cur.message) msg = String(cur.message);
+    cur = cur.cause;
+  }
+  return msg;
 }
 
 /** Per-step status/output of a run, keyed by node id (B17). Queryable live. */
@@ -86,7 +101,7 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
       if (c.to === nodeId && takenEdges.has(i)) input.push(...(outputs[c.from] ?? []));
     });
 
-    steps[nodeId].status = 'running'; // observable as 'running' while awaited
+    steps[nodeId] = { status: 'running', input }; // observable as 'running'; record the input it received
 
     let out: Items;
     let decision: boolean | null = null;
@@ -112,11 +127,11 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
           throw new Error(`unknown node type '${(node as any).type}'`);
       }
     } catch (err: any) {
-      steps[nodeId] = { status: 'failed', error: String(err?.message ?? err) };
+      steps[nodeId] = { status: 'failed', input, error: deepestCause(err) };
       throw err;
     }
     outputs[nodeId] = out;
-    steps[nodeId] = { status: 'completed', output: out };
+    steps[nodeId] = { status: 'completed', input, output: out };
 
     // Mark which outgoing edges are taken, activating their targets.
     def.connections.forEach((c, i) => {

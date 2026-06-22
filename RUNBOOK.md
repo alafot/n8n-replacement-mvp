@@ -158,6 +158,13 @@ and its outcome). Click **History** in the builder to see past runs, or
 history survives engine restarts (it is held in the same on-disk store as
 definitions, independent of the workflow service).
 
+Click a history entry to **inspect** that run per step — each step's input,
+output, and (for failures) the underlying error cause — served from the durably
+persisted run record, so finished runs stay inspectable even after a restart.
+**Re-run** a past run (`POST /runs/:id/rerun`) to start a fresh run of the same
+automation as it was; it appears as a distinct new history entry beside the
+original.
+
 ## Configuration
 
 - `TEMPORAL_ADDRESS` (default `localhost:7233`)

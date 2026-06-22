@@ -22,6 +22,7 @@ import {
   recordRunStart,
   updateRunOutcome,
   listRuns,
+  getRun,
   RunOutcome,
 } from './store';
 import { importN8nWorkflow, N8nExport } from './importN8n';
@@ -114,7 +115,7 @@ async function main(): Promise<void> {
       workflowId: runId,
       args: [def],
     });
-    recordRunStart({ runId, automationName: name, startedAt: new Date().toISOString() });
+    recordRunStart({ runId, automationName: name, startedAt: new Date().toISOString(), graph: def });
 
     return reply.code(202).send({
       runId: handle.workflowId,
@@ -211,7 +212,7 @@ async function main(): Promise<void> {
       workflowId: runId,
       args: [def.graph],
     });
-    recordRunStart({ runId, automationName: def.name, automationId: def.id, startedAt: new Date().toISOString() });
+    recordRunStart({ runId, automationName: def.name, automationId: def.id, startedAt: new Date().toISOString(), graph: def.graph });
 
     return reply.code(202).send({
       runId: handle.workflowId,
@@ -239,19 +240,29 @@ async function main(): Promise<void> {
     return reply.code(200).send(exportToN8n(name ?? 'Exported automation', graph));
   });
 
-  // --- B17: per-step status & output for a run, observable during and after. ---
+  // --- B17/B24: per-step status & output for a run. Live while running; from
+  // the persisted record once finished (so it survives engine restarts). ---
   app.get<{ Params: { id: string } }>('/runs/:id/steps', async (request, reply) => {
     const { id } = request.params;
-    const handle = client.workflow.getHandle(id);
-    let description;
+    // Prefer the durably persisted per-step record for finished runs.
+    const stored = getRun(id);
+    if (stored && stored.steps) {
+      return reply.send({ runId: id, status: stored.status, steps: stored.steps, persisted: true });
+    }
+    // Otherwise query the live run, and persist its detail if it has finished.
     try {
-      description = await handle.describe();
+      const handle = client.workflow.getHandle(id);
+      const description = await handle.describe();
+      const steps = await handle.query(getStepsQuery);
+      const outcome = toOutcome(description.status.name);
+      if (outcome !== 'running') {
+        const finishedAt = description.closeTime ? description.closeTime.toISOString() : new Date().toISOString();
+        updateRunOutcome(id, outcome, finishedAt, steps);
+      }
+      return reply.send({ runId: id, status: toRunStatus(description.status.name), steps, persisted: false });
     } catch (err: any) {
       return reply.code(404).send({ runId: id, error: `no such run: ${err?.message ?? err}` });
     }
-    // Query the (running or closed) run for its per-step state.
-    const steps = await handle.query(getStepsQuery);
-    return reply.send({ runId: id, status: toRunStatus(description.status.name), steps });
   });
 
   // Map Temporal's status to the run-history outcome vocabulary.
@@ -269,17 +280,25 @@ async function main(): Promise<void> {
         return 'failed'; // FAILED, TIMED_OUT
     }
   };
-  // Persist a run's terminal outcome to durable history once it settles.
+  // Persist a run's terminal outcome AND its per-step detail to durable history
+  // once it settles, so finished runs stay inspectable (even after restarts).
   const refreshRun = async (runId: string): Promise<void> => {
     try {
-      const desc = await client.workflow.getHandle(runId).describe();
+      const handle = client.workflow.getHandle(runId);
+      const desc = await handle.describe();
       const outcome = toOutcome(desc.status.name);
       if (outcome !== 'running') {
         const finishedAt = desc.closeTime ? desc.closeTime.toISOString() : new Date().toISOString();
-        updateRunOutcome(runId, outcome, finishedAt);
+        let steps: unknown = undefined;
+        try {
+          steps = await handle.query(getStepsQuery); // capture per-step detail while still queryable
+        } catch {
+          /* query unavailable (e.g. terminated) — keep whatever was already persisted */
+        }
+        updateRunOutcome(runId, outcome, finishedAt, steps);
       }
     } catch {
-      /* run not found in the workflow service (e.g. after its own restart) — keep stored outcome */
+      /* run not found in the workflow service (e.g. after its own restart) — keep stored record */
     }
   };
 
@@ -293,15 +312,53 @@ async function main(): Promise<void> {
   });
 
   // Cancel a run (a user stopping it) -> recorded as 'cancelled' in history.
-  // Uses terminate for a deterministic stop of an in-flight run.
+  // Captures the per-step state at cancel time (so not-yet-run steps are shown
+  // as such, not falsely completed), then stops the run promptly.
   app.post<{ Params: { id: string } }>('/runs/:id/cancel', async (request, reply) => {
+    const id = request.params.id;
     try {
-      await client.workflow.getHandle(request.params.id).terminate('cancelled by user');
-      updateRunOutcome(request.params.id, 'cancelled', new Date().toISOString());
-      return reply.send({ runId: request.params.id, cancelled: true });
+      const handle = client.workflow.getHandle(id);
+      // Snapshot per-step state while still in-flight.
+      let steps: Record<string, any> = {};
+      try {
+        steps = (await handle.query(getStepsQuery)) as Record<string, any>;
+      } catch {
+        /* best effort */
+      }
+      await handle.terminate('cancelled by user');
+      // A step that was mid-flight becomes 'cancelled'; not-yet-run steps stay
+      // 'pending' (never 'completed').
+      for (const k of Object.keys(steps)) {
+        if (steps[k].status === 'running') steps[k] = { ...steps[k], status: 'cancelled' };
+      }
+      updateRunOutcome(id, 'cancelled', new Date().toISOString(), steps);
+      return reply.send({ runId: id, cancelled: true });
     } catch (err: any) {
       return reply.code(404).send({ error: String(err?.message ?? err) });
     }
+  });
+
+  // --- B25: re-run a past run as a fresh, distinct run (same automation as it was). ---
+  app.post<{ Params: { id: string } }>('/runs/:id/rerun', async (request, reply) => {
+    const original = getRun(request.params.id);
+    if (!original) return reply.code(404).send({ error: `no such run: ${request.params.id}` });
+    if (!original.graph) return reply.code(409).send({ error: 'original run has no recorded definition to re-run' });
+
+    const runId = `run-${randomId()}`;
+    const handle = await client.workflow.start(runGraph, {
+      taskQueue: TASK_QUEUE,
+      workflowId: runId,
+      args: [original.graph as GraphDef],
+    });
+    // A NEW, distinct history entry for the SAME automation (original kept).
+    recordRunStart({
+      runId,
+      automationName: original.automationName,
+      automationId: original.automationId,
+      startedAt: new Date().toISOString(),
+      graph: original.graph,
+    });
+    return reply.code(202).send({ runId: handle.workflowId, rerunOf: request.params.id, status: 'in-progress' });
   });
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));

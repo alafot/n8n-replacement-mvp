@@ -37,7 +37,9 @@ function handle(): Database.Database {
       automation_id   TEXT,
       started_at      TEXT NOT NULL,
       finished_at     TEXT,
-      status          TEXT NOT NULL
+      status          TEXT NOT NULL,
+      graph_json      TEXT,
+      steps_json      TEXT
     )
   `);
   return db;
@@ -52,16 +54,24 @@ export interface RunRecord {
   startedAt: string;
   finishedAt: string | null;
   status: RunOutcome;
+  /** The graph definition that was run (so the run is re-runnable as it was). */
+  graph: unknown | null;
+  /** Persisted per-step detail (status/input/output/error), once recorded. */
+  steps: unknown | null;
 }
 
-export function recordRunStart(rec: { runId: string; automationName: string; automationId?: string | null; startedAt: string }): void {
+export function recordRunStart(rec: { runId: string; automationName: string; automationId?: string | null; startedAt: string; graph?: unknown }): void {
   handle()
-    .prepare('INSERT OR REPLACE INTO runs (run_id, automation_name, automation_id, started_at, status) VALUES (?, ?, ?, ?, ?)')
-    .run(rec.runId, rec.automationName, rec.automationId ?? null, rec.startedAt, 'running');
+    .prepare('INSERT OR REPLACE INTO runs (run_id, automation_name, automation_id, started_at, status, graph_json) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(rec.runId, rec.automationName, rec.automationId ?? null, rec.startedAt, 'running', rec.graph ? JSON.stringify(rec.graph) : null);
 }
 
-export function updateRunOutcome(runId: string, status: RunOutcome, finishedAt: string | null): void {
-  handle().prepare('UPDATE runs SET status = ?, finished_at = ? WHERE run_id = ?').run(status, finishedAt, runId);
+export function updateRunOutcome(runId: string, status: RunOutcome, finishedAt: string | null, steps?: unknown): void {
+  if (steps !== undefined) {
+    handle().prepare('UPDATE runs SET status = ?, finished_at = ?, steps_json = ? WHERE run_id = ?').run(status, finishedAt, JSON.stringify(steps), runId);
+  } else {
+    handle().prepare('UPDATE runs SET status = ?, finished_at = ? WHERE run_id = ?').run(status, finishedAt, runId);
+  }
 }
 
 function rowToRun(r: any): RunRecord {
@@ -72,6 +82,8 @@ function rowToRun(r: any): RunRecord {
     startedAt: r.started_at,
     finishedAt: r.finished_at,
     status: r.status,
+    graph: r.graph_json ? JSON.parse(r.graph_json) : null,
+    steps: r.steps_json ? JSON.parse(r.steps_json) : null,
   };
 }
 

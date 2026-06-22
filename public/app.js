@@ -339,13 +339,34 @@ async function showHistory() {
     tr.dataset.status = r.status;
     tr.style.borderTop = '1px solid #eee';
     const when = new Date(r.startedAt).toLocaleString();
+    tr.style.cursor = 'pointer';
     tr.innerHTML =
       '<td style="padding:6px;" data-testid="history-automation">' + r.automationName + '</td>' +
       '<td style="padding:6px;" data-testid="history-when">' + when + '</td>' +
       '<td style="padding:6px; font-weight:600; color:' + (STATUS_COLOR[r.status] || '#333') + '" data-testid="history-status">' + r.status + '</td>';
+    tr.addEventListener('click', () => inspectRun(r.runId));
     tbody.appendChild(tr);
   }
+  $('#run-detail').innerHTML = '';
   $('#history-panel').style.display = 'block';
+}
+
+// B24: open a past run and inspect per-step input/output/error.
+async function inspectRun(runId) {
+  const data = await fetch('/runs/' + runId + '/steps').then((r) => r.json());
+  const el = $('#run-detail');
+  el.dataset.runId = runId;
+  el.dataset.persisted = String(data.persisted ?? false);
+  let html = '<h3 style="font-size:13px; margin:6px 0;">Run ' + runId + ' — ' + data.status + (data.persisted ? ' (from saved record)' : '') + '</h3>';
+  for (const [stepId, s] of Object.entries(data.steps || {})) {
+    html += '<div class="step-detail" data-testid="step-detail" data-step-id="' + stepId + '" data-step-status="' + s.status + '" style="border:1px solid #e6e8ee; border-radius:8px; padding:8px; margin-bottom:8px;">' +
+      '<div style="font-weight:600;">' + stepId + ' — <span style="color:' + (STATUS_COLOR[s.status] || '#333') + '">' + s.status + '</span></div>' +
+      (s.input !== undefined ? '<div style="font-size:11px;color:#6b7280;margin-top:4px;">input</div><pre data-testid="step-input" style="font-size:11px;background:#f6f7f9;padding:6px;border-radius:6px;overflow-x:auto;">' + JSON.stringify(s.input) + '</pre>' : '') +
+      (s.output !== undefined ? '<div style="font-size:11px;color:#6b7280;">output</div><pre data-testid="step-output-detail" style="font-size:11px;background:#f6f7f9;padding:6px;border-radius:6px;overflow-x:auto;">' + JSON.stringify(s.output) + '</pre>' : '') +
+      (s.error !== undefined ? '<div style="font-size:11px;color:#e03131;">error cause</div><pre data-testid="step-error" style="font-size:11px;background:#fff0f0;padding:6px;border-radius:6px;">' + s.error + '</pre>' : '') +
+      '</div>';
+  }
+  el.innerHTML = html;
 }
 $('#btn-history').addEventListener('click', showHistory);
 $('#btn-history-close').addEventListener('click', () => { $('#history-panel').style.display = 'none'; });
