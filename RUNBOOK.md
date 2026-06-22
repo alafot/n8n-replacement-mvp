@@ -113,8 +113,11 @@ open http://127.0.0.1:3000/
 ```
 
 The left palette lists the available step types (Call a web service, Reshape
-data, Branch on a condition, Run a code snippet); clicking one places a step of
-the matching engine type on the canvas.
+data, Branch on a condition, Route by rules (Switch), Run a code snippet);
+clicking one places a step of the matching engine type on the canvas. The Switch
+step does multi-way per-item routing: configure a set of rules (each routes
+matching items to its own output), with an optional fallback output for items
+matching no rule.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

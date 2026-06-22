@@ -7,6 +7,7 @@ const STEP_TYPES = [
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)' },
+  { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -35,8 +36,28 @@ function defaultParams(type) {
   if (type === 'httpRequest') return { method: 'GET', url: '' };
   if (type === 'transform') return { set: {}, copy: {}, rename: {}, remove: [] };
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
+  if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'code') return { code: 'return $input;' };
   return {};
+}
+
+// Output ports a node exposes (drives rendering + connection 'port' values).
+function portsOf(node) {
+  if (node.type === 'if') return ['true', 'false'];
+  if (node.type === 'switch') {
+    const rules = (node.params && Array.isArray(node.params.rules)) ? node.params.rules : [];
+    const ports = rules.map((_, i) => String(i));
+    if (node.params && node.params.fallback) ports.push('fallback');
+    return ports;
+  }
+  return ['main'];
+}
+function portLabel(port) {
+  if (port === 'true') return 'T';
+  if (port === 'false') return 'F';
+  if (port === 'fallback') return '*';
+  if (port === 'main') return '→';
+  return String(Number(port) + 1); // rule outputs shown 1-based
 }
 
 function addNode(type, pos) {
@@ -61,10 +82,10 @@ function nodeById(id) {
 // ---- connections ----
 function portPoint(node, port) {
   const x = node.x + 170;
-  let y = node.y + 22;
-  if (port === 'true') y = node.y + 16;
-  else if (port === 'false') y = node.y + 40;
-  return { x, y };
+  const ports = portsOf(node);
+  if (ports.length <= 1) return { x, y: node.y + 22 };
+  const idx = Math.max(0, ports.indexOf(port));
+  return { x, y: node.y + 16 + idx * 18 }; // stack multiple outputs down the right edge
 }
 function nodeInPoint(node) {
   return { x: node.x, y: node.y + 22 };
@@ -227,15 +248,15 @@ function render() {
     // output ports
     const ports = document.createElement('div');
     ports.className = 'ports';
-    const portList = n.type === 'if' ? ['true', 'false'] : ['main'];
+    const portList = portsOf(n);
     for (const p of portList) {
       const pe = document.createElement('div');
       pe.className = 'port' + (state.arm && state.arm.from === n.id && state.arm.port === p ? ' armed' : '');
       pe.dataset.testid = 'port';
       pe.dataset.nodeId = n.id;
       pe.dataset.port = p;
-      pe.title = 'drag from ' + p + ' to a target step';
-      pe.textContent = p === 'true' ? 'T' : p === 'false' ? 'F' : '→';
+      pe.title = 'drag from output ' + p + ' to a target step';
+      pe.textContent = portLabel(p);
       pe.addEventListener('mousedown', (ev) => { ev.stopPropagation(); ev.preventDefault(); startConnectDrag(n.id, p, ev); });
       ports.appendChild(pe);
     }
@@ -353,6 +374,36 @@ function renderConfig() {
     sel.addEventListener('change', () => { n.params.condition.op = sel.value; });
     c.appendChild(field('Operator', 'cfg-op', sel));
     c.appendChild(field('Compare value', 'cfg-right', input(String(n.params.condition.right ?? ''), (v) => { const num = Number(v); n.params.condition.right = v !== '' && !Number.isNaN(num) ? num : v; })));
+  } else if (n.type === 'switch') {
+    n.params.rules = Array.isArray(n.params.rules) ? n.params.rules : [];
+    const ops = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'truthy', 'contains'];
+    const lab = document.createElement('label'); lab.textContent = 'Routing rules (each routes matching items to its own output)';
+    c.appendChild(lab);
+    n.params.rules.forEach((rule, i) => {
+      const row = document.createElement('div');
+      row.dataset.testid = 'switch-rule';
+      row.dataset.ruleIndex = String(i);
+      row.style.cssText = 'display:flex; gap:4px; align-items:center; margin-bottom:6px;';
+      row.innerHTML = `<span style="font-size:11px; color:#6b7280; width:54px;">out ${i + 1}:</span>`;
+      const left = input(rule.left, (v) => (rule.left = v)); left.dataset.testid = `switch-rule-${i}-left`; left.style.flex = '1';
+      const sel = document.createElement('select'); sel.dataset.testid = `switch-rule-${i}-op`;
+      for (const op of ops) { const o = document.createElement('option'); o.value = op; o.textContent = op; if (rule.op === op) o.selected = true; sel.appendChild(o); }
+      sel.addEventListener('change', () => { rule.op = sel.value; });
+      const right = input(String(rule.right ?? ''), (v) => { const num = Number(v); rule.right = v !== '' && !Number.isNaN(num) ? num : v; }); right.dataset.testid = `switch-rule-${i}-right`; right.style.width = '70px';
+      const rm = document.createElement('button'); rm.textContent = '×'; rm.dataset.testid = `switch-rule-${i}-remove`;
+      rm.addEventListener('click', () => { n.params.rules.splice(i, 1); render(); });
+      row.append(left, sel, right, rm);
+      c.appendChild(row);
+    });
+    const addBtn = document.createElement('button'); addBtn.textContent = '+ Add rule'; addBtn.dataset.testid = 'switch-add-rule';
+    addBtn.addEventListener('click', () => { n.params.rules.push({ left: 'json.value', op: 'eq', right: '' }); render(); });
+    c.appendChild(addBtn);
+    const fbWrap = document.createElement('div'); fbWrap.style.marginTop = '8px';
+    const fb = document.createElement('input'); fb.type = 'checkbox'; fb.checked = !!n.params.fallback; fb.dataset.testid = 'switch-fallback';
+    fb.addEventListener('change', () => { n.params.fallback = fb.checked; render(); });
+    const fbLab = document.createElement('label'); fbLab.style.cssText = 'display:inline; font-weight:400;'; fbLab.textContent = ' Fallback output for items matching no rule';
+    fbWrap.append(fb, fbLab);
+    c.appendChild(fbWrap);
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

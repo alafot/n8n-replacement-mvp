@@ -76,9 +76,30 @@ export async function runHttpRequest(input: HttpRequestInput): Promise<Items> {
  *   - returns the terminal executed node's output as the overall result.
  * The HTTP-request step (B2) is reused unchanged as one node type.
  */
+// Route each incoming item to the output of the FIRST rule it matches (Switch,
+// B31). Items matching no rule go to the 'fallback' output if enabled, else are
+// dropped. Returns a per-output-port map of items.
+function routeSwitch(params: any, items: Items): Record<string, Items> {
+  const rules: Condition[] = Array.isArray(params.rules) ? params.rules : [];
+  const emit: Record<string, Items> = {};
+  for (let i = 0; i < rules.length; i++) emit[String(i)] = [];
+  if (params.fallback) emit['fallback'] = [];
+  for (const item of items) {
+    let matched = -1;
+    for (let i = 0; i < rules.length; i++) {
+      if (evaluateCondition(rules[i], item)) { matched = i; break; }
+    }
+    if (matched >= 0) emit[String(matched)].push(item);
+    else if (params.fallback) emit['fallback'].push(item);
+    // no match + no fallback -> item is dropped (defined, consistent)
+  }
+  return emit;
+}
+
 export async function runGraph(def: GraphDefinition): Promise<Items> {
   const order = topologicalOrder(def);
-  const outputs: Record<string, Items> = {};
+  // Per-node, PER-OUTPUT-PORT outputs (a Switch emits different items per port).
+  const portOutputs: Record<string, Record<string, Items>> = {};
 
   // Per-step state, exposed via query so callers can watch progress live (B17).
   const steps: Record<string, StepState> = {};
@@ -95,34 +116,36 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
     if (!active.has(nodeId)) continue; // untaken branch — no execution, no output
     const node = def.nodes.find((n) => n.id === nodeId)!;
 
-    // Input = items from taken incoming edges only.
+    // Input = items from the TAKEN incoming edges' source ports only.
     const input: Items = [];
     def.connections.forEach((c, i) => {
-      if (c.to === nodeId && takenEdges.has(i)) input.push(...(outputs[c.from] ?? []));
+      if (c.to === nodeId && takenEdges.has(i)) input.push(...(portOutputs[c.from]?.[c.port ?? 'main'] ?? []));
     });
 
     steps[nodeId] = { status: 'running', input }; // observable as 'running'; record the input it received
 
-    let out: Items;
-    let decision: boolean | null = null;
+    let emit: Record<string, Items>; // output port -> items
     try {
       switch (node.type) {
         case 'httpRequest':
-          out = await httpRequest(node.params as unknown as HttpRequestInput);
+          emit = { main: await httpRequest(node.params as unknown as HttpRequestInput) };
           break;
         case 'code':
-          out = await runCode({ code: String(node.params.code ?? ''), input });
+          emit = { main: await runCode({ code: String(node.params.code ?? ''), input }) };
           break;
         case 'transform':
-          out = await runTransform({ config: node.params as any, input });
+          emit = { main: await runTransform({ config: node.params as any, input }) };
           break;
         case 'if': {
-          // Pure decision over the incoming items; passes items through so the
-          // chosen branch receives the same data.
-          decision = evaluateCondition(node.params.condition as Condition, input[0]);
-          out = input;
+          // Routes ALL items down the matched branch (true/false).
+          const decision = evaluateCondition(node.params.condition as Condition, input[0]);
+          emit = { [decision ? 'true' : 'false']: input };
           break;
         }
+        case 'switch':
+          // Per-ITEM multi-way routing across the rule outputs (+ fallback).
+          emit = routeSwitch(node.params, input);
+          break;
         default:
           throw new Error(`unknown node type '${(node as any).type}'`);
       }
@@ -130,14 +153,17 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
       steps[nodeId] = { status: 'failed', input, error: deepestCause(err) };
       throw err;
     }
-    outputs[nodeId] = out;
-    steps[nodeId] = { status: 'completed', input, output: out };
+    portOutputs[nodeId] = emit;
+    steps[nodeId] = { status: 'completed', input, output: Object.values(emit).flat() };
 
-    // Mark which outgoing edges are taken, activating their targets.
+    // Mark which outgoing edges are taken, activating their targets. For gated
+    // nodes (if/switch) an edge is taken only if its port actually has items, so
+    // unmatched outputs (and their downstreams) leave no effect.
+    const gated = node.type === 'if' || node.type === 'switch';
     def.connections.forEach((c, i) => {
       if (c.from !== nodeId) return;
       const port = c.port ?? 'main';
-      const take = node.type === 'if' ? port === (decision ? 'true' : 'false') : true;
+      const take = gated ? (emit[port] && emit[port].length > 0) : true;
       if (take) {
         takenEdges.add(i);
         active.add(c.to);
@@ -145,7 +171,7 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
     });
   }
 
-  // Steps on a not-taken branch report 'skipped' (distinct from failed/completed).
+  // Steps on a not-taken branch/output report 'skipped' (distinct from failed/completed).
   for (const nodeId of order) {
     if (active.has(nodeId)) continue;
     const ups = def.connections.filter((c) => c.to === nodeId).map((c) => c.from);
@@ -155,9 +181,10 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
   }
 
   // Overall result = the last executed node in dependency order (terminal of
-  // the taken path).
+  // the taken path), combining its output ports.
   for (let i = order.length - 1; i >= 0; i--) {
-    if (active.has(order[i]) && outputs[order[i]]) return outputs[order[i]];
+    const po = portOutputs[order[i]];
+    if (active.has(order[i]) && po) return Object.values(po).flat();
   }
   return [];
 }

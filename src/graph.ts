@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch';
 
 export interface GraphNode {
   /** Unique node id within the graph. */
@@ -19,12 +19,11 @@ export interface GraphConnection {
   /** id of the downstream node receiving that data. */
   to: string;
   /**
-   * Output port of the upstream node this edge leaves from. For an 'if' node,
-   * 'true' / 'false' select the branch; for all other nodes the default
-   * 'main' is used. An edge is only "taken" when its port matches the upstream
-   * node's decision.
+   * Output port of the upstream node this edge leaves from. 'main' for ordinary
+   * nodes; 'true' / 'false' for an 'if' branch; a rule index ('0','1',...) or
+   * 'fallback' for a 'switch'. An edge is only "taken" when its port carries items.
    */
-  port?: 'main' | 'true' | 'false';
+  port?: string;
 }
 
 /** A structured, pure boolean condition for the IF node (no code execution). */
