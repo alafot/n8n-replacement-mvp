@@ -14,7 +14,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 |---|------|--------|-----------------|------------|
 | UX | Palette redesign (categories, icons, tooltips) | ✅ satisfied | categorized palette + hover tooltip | `palette-redesign/palette-categories.png`, `palette-redesign/palette-tooltip-hover.png` |
 | 3 | Merge | ✅ satisfied | 2 branches (A:2 items + B:1) → Merge(append) → sink | `merge/merge-success.png` |
-| 4 | Loop Over Items | _pending_ | — | — |
+| 4 | Loop Over Items | ✅ satisfied | seed(3 items) → Loop(batch 1) → body / done | `loop-over-items/loop-success.png` |
 | 5 | Wait | _pending_ | — | — |
 | 6 | No Operation | _pending_ | — | — |
 | 7 | Stop and Error | _pending_ | — | — |
@@ -51,3 +51,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the Merge output contained all 3 items together — `{src:A,n:1}`, `{src:A,n:2}`, `{src:B,n:3}` — i.e. items from BOTH inputs appear on the single combined output. Screenshot shows the completed run with the merge inspector output.
 - Screenshot: `merge/merge-success.png`. Demo: `merge/demo.mjs`.
 - Assumptions: used the baseline "append" combine mode for the demo (the node also exposes a mode selector).
+
+### Node 4 — Loop Over Items ✅
+- Sample workflow: seed (3 items) → **Loop Over Items** (batch size 1); its loop output → a body step that marks each item `processed:true`; its done output → a done step. Ran on the real engine; run **completed**.
+- Verified: the loop body ran **3 times** (once per item at batch size 1), every item reached the done path **exactly once** (ids 1,2,3, iterations 0,1,2), all `processed:true`, and the done path completed after the final batch. Screenshot shows the completed run with the done-path output.
+- Screenshot: `loop-over-items/loop-success.png`. Demo: `loop-over-items/demo.mjs`.
+- Assumptions: demoed at batch size 1 (the node also takes larger batch sizes → correspondingly fewer iterations, still every item once).

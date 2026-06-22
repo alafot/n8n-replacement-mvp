@@ -4,7 +4,7 @@
 // HTTP-request step and returns its output as the run's result, in the
 // standard item format.
 
-import { proxyActivities, defineQuery, setHandler } from '@temporalio/workflow';
+import { proxyActivities, defineQuery, setHandler, sleep } from '@temporalio/workflow';
 import type * as activities from './activities';
 import type { HttpRequestInput } from './activities';
 import type { Items } from './itemFormat';
@@ -119,6 +119,13 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       return { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
     case 'merge':
       return { main: input };
+    case 'wait': {
+      // Pause the run for the configured time (durable timer), then pass the
+      // items through UNCHANGED.
+      const ms = Math.max(0, Number((node.params as any).ms) || 0);
+      if (ms > 0) await sleep(ms);
+      return { main: input };
+    }
     default:
       throw new Error(`unknown node type '${(node as any).type}'`);
   }

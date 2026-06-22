@@ -11,6 +11,7 @@ const STEP_TYPES = [
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
   { type: 'merge', label: 'Merge inputs', hint: 'Merge', category: 'Flow', icon: '🔗', desc: 'Combine items from multiple incoming branches into one output.' },
   { type: 'loop', label: 'Loop over items', hint: 'Loop (batches)', category: 'Flow', icon: '🔁', desc: 'Iterate items in batches: run the loop body once per batch, then continue on the done output.' },
+  { type: 'wait', label: 'Wait', hint: 'Pause', category: 'Flow', icon: '⏱️', desc: 'Pause the run for a configured time, then pass items through unchanged.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -44,6 +45,7 @@ function defaultParams(type) {
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
   if (type === 'merge') return { mode: 'append' };
   if (type === 'loop') return { batchSize: 1 };
+  if (type === 'wait') return { ms: 1500 };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -439,6 +441,13 @@ function renderConfig() {
     const inp = input(String(n.params.batchSize), (v) => { const num = Math.max(1, Math.floor(Number(v) || 1)); n.params.batchSize = num; });
     inp.type = 'number'; inp.min = '1';
     c.appendChild(field('Batch size', 'cfg-batch-size', inp));
+  } else if (n.type === 'wait') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Pauses the run for the duration, then passes items through unchanged.';
+    c.appendChild(note);
+    n.params.ms = n.params.ms ?? 1500;
+    const inp = input(String(n.params.ms), (v) => { const num = Math.max(0, Math.floor(Number(v) || 0)); n.params.ms = num; });
+    inp.type = 'number'; inp.min = '0';
+    c.appendChild(field('Duration (ms)', 'cfg-wait-ms', inp));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }
