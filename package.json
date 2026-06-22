@@ -11,7 +11,9 @@
     "e2e:canvas": "node e2e/canvas.mjs",
     "e2e:builder": "node e2e/builder.mjs",
     "e2e:run": "node e2e/run.mjs",
-    "e2e:import": "node e2e/import.mjs"
+    "e2e:import": "node e2e/import.mjs",
+    "e2e:import-mixed": "node e2e/import-mixed.mjs",
+    "e2e:roundtrip": "node e2e/roundtrip.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",

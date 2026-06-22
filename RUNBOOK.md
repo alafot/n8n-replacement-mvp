@@ -140,7 +140,14 @@ connections (including branch true/false routes), and per-step settings are
 mapped onto the canvas as equivalent supported steps, ready to edit and run.
 
 The mapping is also available as an API: `POST /import/n8n` with the n8n export
-as the body returns `{ name, graph }`.
+as the body returns `{ name, graph, unsupported }`. An imported automation runs
+on the engine like any other (per-step status incl. `skipped`). If the export
+contains unsupported node types, they are listed (not silently dropped) and the
+supported remainder is imported.
+
+**Export** the current automation back to n8n-compatible JSON with the **Export
+n8n** button (or `POST /export/n8n` with `{ name, graph }`). It round-trips:
+re-importing an exported file reproduces the same steps, wiring, and config.
 
 ## Configuration
 

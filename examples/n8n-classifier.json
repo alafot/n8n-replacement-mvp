@@ -1,0 +1,82 @@
+{
+  "name": "Score classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { score: 72 } }];"
+      },
+      "id": "cls-0001-seed",
+      "name": "Provide score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cnd-1",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 50,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cls-0002-if",
+      "name": "Score over 50?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "s1", "name": "tier", "value": "premium", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cls-0003-premium",
+      "name": "Tier premium",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "s2", "name": "tier", "value": "basic", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cls-0004-basic",
+      "name": "Tier basic",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 420]
+    }
+  ],
+  "connections": {
+    "Provide score": {
+      "main": [ [ { "node": "Score over 50?", "type": "main", "index": 0 } ] ]
+    },
+    "Score over 50?": {
+      "main": [
+        [ { "node": "Tier premium", "type": "main", "index": 0 } ],
+        [ { "node": "Tier basic", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

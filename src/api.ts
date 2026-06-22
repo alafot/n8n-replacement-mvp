@@ -21,6 +21,8 @@ import {
   deleteDefinition,
 } from './store';
 import { importN8nWorkflow, N8nExport } from './importN8n';
+import { exportToN8n } from './exportN8n';
+import type { GraphDefinition as GraphDef } from './graph';
 import type { Items } from './itemFormat';
 import { ADDRESS, NAMESPACE, TASK_QUEUE } from './temporal';
 
@@ -216,6 +218,15 @@ async function main(): Promise<void> {
     } catch (err: any) {
       return reply.code(400).send({ error: String(err?.message ?? err) });
     }
+  });
+
+  // --- B22: export an automation to n8n-compatible workflow JSON. ---
+  app.post('/export/n8n', async (request, reply) => {
+    const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDef };
+    if (!graph || !Array.isArray(graph.nodes)) {
+      return reply.code(400).send({ error: 'graph{nodes,connections} is required' });
+    }
+    return reply.code(200).send(exportToN8n(name ?? 'Exported automation', graph));
   });
 
   // --- B17: per-step status & output for a run, observable during and after. ---

@@ -1,0 +1,68 @@
+{
+  "name": "Mixed workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/orders/7",
+        "options": {}
+      },
+      "id": "mix-0001-http",
+      "name": "Fetch order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "m1", "name": "processed", "value": "yes", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mix-0002-set",
+      "name": "Tag processed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": "C0123",
+        "text": "Order processed"
+      },
+      "id": "mix-0003-slack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [ { "field": "hours" } ] }
+      },
+      "id": "mix-0004-schedule",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [40, 300]
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [ [ { "node": "Fetch order", "type": "main", "index": 0 } ] ]
+    },
+    "Fetch order": {
+      "main": [ [ { "node": "Tag processed", "type": "main", "index": 0 } ] ]
+    },
+    "Tag processed": {
+      "main": [ [ { "node": "Notify Slack", "type": "main", "index": 0 } ] ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

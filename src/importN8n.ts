@@ -131,37 +131,58 @@ function slug(name: string): string {
   return 'n_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
-export function importN8nWorkflow(wf: N8nExport): { name: string; graph: GraphDefinition } {
+export interface UnsupportedNode {
+  id: string;
+  name: string;
+  type: string;
+}
+export interface ImportResult {
+  name: string;
+  graph: GraphDefinition;
+  /** n8n nodes whose type is not supported — surfaced, never silently dropped (B21). */
+  unsupported: UnsupportedNode[];
+}
+
+export function importN8nWorkflow(wf: N8nExport): ImportResult {
   const nameToId: Record<string, string> = {};
-  const nodes: GraphNode[] = wf.nodes.map((n) => {
+  const supportedNames = new Set<string>();
+  const unsupported: UnsupportedNode[] = [];
+  const nodes: GraphNode[] = [];
+
+  for (const n of wf.nodes) {
     const type = TYPE_MAP[n.type];
-    if (!type) throw new Error(`unsupported n8n node type: ${n.type}`);
+    if (!type) {
+      // Surface the unsupported node by id/name/type rather than failing.
+      unsupported.push({ id: n.id ?? slug(n.name), name: n.name, type: n.type });
+      continue;
+    }
     const id = n.id || slug(n.name);
     nameToId[n.name] = id;
-    return {
+    supportedNames.add(n.name);
+    nodes.push({
       id,
       type,
       label: n.name,
       position: { x: n.position?.[0] ?? 0, y: n.position?.[1] ?? 0 },
       params: mapParams(type, n.parameters ?? {}),
-    } as GraphNode;
-  });
+    } as GraphNode);
+  }
 
   const typeById = new Map(nodes.map((n) => [n.id, n.type]));
   const connections: GraphConnection[] = [];
   for (const [fromName, outs] of Object.entries(wf.connections ?? {})) {
     const from = nameToId[fromName];
-    if (!from) continue;
+    if (!from) continue; // skip connections leaving an unsupported node
     const main = outs.main ?? [];
     main.forEach((targets, outputIndex) => {
       // IF nodes: output 0 -> true branch, output 1 -> false branch.
       const port = typeById.get(from) === 'if' ? (outputIndex === 0 ? 'true' : 'false') : 'main';
       for (const t of targets ?? []) {
         const to = nameToId[t.node];
-        if (to) connections.push({ from, to, port: port as GraphConnection['port'] });
+        if (to) connections.push({ from, to, port: port as GraphConnection['port'] }); // only wire among supported nodes
       }
     });
   }
 
-  return { name: wf.name ?? 'Imported workflow', graph: { nodes, connections } };
+  return { name: wf.name ?? 'Imported workflow', graph: { nodes, connections }, unsupported };
 }

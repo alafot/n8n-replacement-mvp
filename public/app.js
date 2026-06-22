@@ -340,6 +340,31 @@ $('#import-file').addEventListener('change', async (ev) => {
   history.replaceState(null, '', location.pathname);
   $('#run-status').textContent = 'imported ' + (res.name || '') + ' (' + res.graph.nodes.length + ' steps)';
   $('#run-status').dataset.imported = 'true';
+  // Surface any unsupported nodes (B21) — never drop them silently.
+  const warn = $('#import-warning');
+  if (res.unsupported && res.unsupported.length) {
+    warn.dataset.unsupportedCount = String(res.unsupported.length);
+    warn.dataset.unsupported = JSON.stringify(res.unsupported);
+    warn.textContent = '⚠ ' + res.unsupported.length + ' unsupported step(s) not imported: ' +
+      res.unsupported.map((u) => `${u.name} [${u.type}]`).join(', ');
+  } else {
+    warn.dataset.unsupportedCount = '0';
+    warn.textContent = '';
+  }
+});
+
+// Export the current automation to n8n-compatible JSON and download it (B22).
+$('#btn-export').addEventListener('click', async () => {
+  const body = JSON.stringify({ name: $('#automation-name').value || 'Exported automation', graph: toGraph() });
+  const n8n = await fetch('/export/n8n', { method: 'POST', headers: { 'content-type': 'application/json' }, body }).then((r) => r.json());
+  const blob = new Blob([JSON.stringify(n8n, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = ($('#automation-name').value || 'workflow') + '.n8n.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  $('#run-status').textContent = 'exported n8n JSON (' + n8n.nodes.length + ' nodes)';
 });
 
 // On load: if ?def=ID present, restore from durable storage (B15 fresh session).
