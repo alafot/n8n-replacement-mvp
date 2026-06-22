@@ -152,6 +152,13 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       });
       return { main: sorted };
     }
+    case 'limit': {
+      // Cap the item count at N, keeping the first (or last) N in original order.
+      const max = Math.max(0, Math.floor(Number((node.params as any).max) || 0));
+      const keepLast = (node.params as any).keep === 'last';
+      if (input.length <= max) return { main: input };
+      return { main: keepLast ? input.slice(input.length - max) : input.slice(0, max) };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

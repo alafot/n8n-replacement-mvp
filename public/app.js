@@ -9,6 +9,7 @@ const STEP_TYPES = [
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
   { type: 'splitOut', label: 'Split out', hint: 'Split Out', category: 'Transform', icon: '✂️', desc: 'Expand an item\'s list field into multiple items, one per element.' },
   { type: 'sort', label: 'Sort', hint: 'Sort', category: 'Transform', icon: '↕️', desc: 'Reorder items by a chosen field, ascending or descending.' },
+  { type: 'limit', label: 'Limit', hint: 'Limit', category: 'Transform', icon: '🔢', desc: 'Cap how many items pass through, keeping at most N.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -53,6 +54,7 @@ function defaultParams(type) {
   if (type === 'aggregate') return { field: 'json.value', outputName: 'values' };
   if (type === 'splitOut') return { field: 'json.values', outputName: 'value' };
   if (type === 'sort') return { field: 'json.value', direction: 'asc' };
+  if (type === 'limit') return { max: 1, keep: 'first' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -500,6 +502,16 @@ function renderConfig() {
     for (const d of ['asc', 'desc']) { const o = document.createElement('option'); o.value = d; o.textContent = d === 'asc' ? 'Ascending' : 'Descending'; if (n.params.direction === d) o.selected = true; sel.appendChild(o); }
     sel.addEventListener('change', () => { n.params.direction = sel.value; });
     c.appendChild(field('Direction', 'cfg-sort-direction', sel));
+  } else if (n.type === 'limit') {
+    n.params.max = n.params.max ?? 1;
+    n.params.keep = n.params.keep ?? 'first';
+    const inp = input(String(n.params.max), (v) => { n.params.max = Math.max(0, Math.floor(Number(v) || 0)); });
+    inp.type = 'number'; inp.min = '0';
+    c.appendChild(field('Max items', 'cfg-limit-max', inp));
+    const sel = document.createElement('select');
+    for (const k of ['first', 'last']) { const o = document.createElement('option'); o.value = k; o.textContent = k === 'first' ? 'Keep first N' : 'Keep last N'; if (n.params.keep === k) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.keep = sel.value; });
+    c.appendChild(field('Keep', 'cfg-limit-keep', sel));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

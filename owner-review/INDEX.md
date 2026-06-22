@@ -21,7 +21,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 8 | Execute Sub-workflow | ✅ satisfied | save "Doubler" sub; parent seed(5)→ExecuteSub→sink ⇒ 10 | `execute-sub-workflow/execute-sub-success.png` |
 | 9 | Aggregate | ✅ satisfied | seed(amount 10,20,30) → Aggregate ⇒ one item {amounts:[10,20,30]} | `aggregate/aggregate-success.png` |
 | 10 | Split Out | ✅ satisfied | seed{tags:[a,b,c]} → Split Out ⇒ 3 items (a/b/c) | `split-out/split-out-success.png` |
-| 11 | Sort | _pending_ | — | — |
+| 11 | Sort | ✅ satisfied | seed[3,1,2,1] → Sort(asc) ⇒ [1,1,2,3] | `sort/sort-success.png` |
 | 12 | Limit | _pending_ | — | — |
 | 13 | Remove Duplicates | _pending_ | — | — |
 | 14 | Rename Keys | _pending_ | — | — |
@@ -97,3 +97,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the single item expanded into **3 items** `{tag:a}/{tag:b}/{tag:c}` — one element per item, in order, none missing/duplicated — and downstream received all 3. True inverse of Aggregate.
 - Screenshot: `split-out/split-out-success.png`. Demo: `split-out/demo.mjs`.
 - Assumptions: split a string list (`tags`) placing each element on field `tag`.
+
+### Node 11 — Sort ✅
+- Sample: seed (`value` = `[3,1,2,1]`) → **Sort** (field `json.value`, Ascending) → sink. Ran on the real engine; run **completed**.
+- Verified: items emerged ascending `[1,1,2,3]` — same set and count preserved including the duplicate, nothing dropped/added — and downstream received all 4 in sorted order. (Examiner also confirmed Descending → `[3,2,1,1]`.)
+- Screenshot: `sort/sort-success.png`. Demo: `sort/demo.mjs`.
+- Assumptions: demoed ascending on a numeric field; direction selector also offers descending.
