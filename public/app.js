@@ -8,6 +8,7 @@ const STEP_TYPES = [
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)' },
+  { type: 'filter', label: 'Keep matching items', hint: 'Filter' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -37,6 +38,7 @@ function defaultParams(type) {
   if (type === 'transform') return { set: {}, copy: {}, rename: {}, remove: [] };
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
+  if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
   if (type === 'code') return { code: 'return $input;' };
   return {};
 }
@@ -404,6 +406,16 @@ function renderConfig() {
     const fbLab = document.createElement('label'); fbLab.style.cssText = 'display:inline; font-weight:400;'; fbLab.textContent = ' Fallback output for items matching no rule';
     fbWrap.append(fb, fbLab);
     c.appendChild(fbWrap);
+  } else if (n.type === 'filter') {
+    n.params.condition = n.params.condition || { left: '', op: 'gte', right: 0 };
+    const k = document.createElement('div'); k.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; k.textContent = 'Keep items matching (others are dropped):';
+    c.appendChild(k);
+    c.appendChild(field('Field (path)', 'cfg-left', input(n.params.condition.left, (v) => (n.params.condition.left = v))));
+    const sel = document.createElement('select');
+    for (const op of ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'truthy', 'contains']) { const o = document.createElement('option'); o.value = op; o.textContent = op; if (n.params.condition.op === op) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.condition.op = sel.value; });
+    c.appendChild(field('Operator', 'cfg-op', sel));
+    c.appendChild(field('Compare value', 'cfg-right', input(String(n.params.condition.right ?? ''), (v) => { const num = Number(v); n.params.condition.right = v !== '' && !Number.isNaN(num) ? num : v; })));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

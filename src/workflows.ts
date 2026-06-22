@@ -146,6 +146,11 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
           // Per-ITEM multi-way routing across the rule outputs (+ fallback).
           emit = routeSwitch(node.params, input);
           break;
+        case 'filter':
+          // Keep only items matching the condition; dropped items are genuinely
+          // absent from the single narrowed output.
+          emit = { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
+          break;
         default:
           throw new Error(`unknown node type '${(node as any).type}'`);
       }

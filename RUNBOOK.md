@@ -117,7 +117,8 @@ data, Branch on a condition, Route by rules (Switch), Run a code snippet);
 clicking one places a step of the matching engine type on the canvas. The Switch
 step does multi-way per-item routing: configure a set of rules (each routes
 matching items to its own output), with an optional fallback output for items
-matching no rule.
+matching no rule. The Filter step keeps only the items matching a condition on a
+single narrowed output (non-matching items are dropped).
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

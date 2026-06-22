@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter';
 
 export interface GraphNode {
   /** Unique node id within the graph. */
