@@ -116,11 +116,14 @@ The left palette lists the available step types (Call a web service, Reshape
 data, Branch on a condition, Run a code snippet); clicking one places a step of
 the matching engine type on the canvas.
 
-From the canvas you can: add steps from the palette, wire them together
-(including a branch step's true/false ports to distinct downstream steps),
-select a step to configure its parameters, **Save** the automation (stored
-durably), reopen it later (`/?def=<id>`), and **Run** it with a single click —
-watching each step's status update live and inspecting any step's output.
+From the canvas you can: add steps from the palette, wire them together by
+**dragging** from a step's output handle and releasing on a target step (drop
+anywhere on its body — for a branch step, drag from its T / F handle to choose
+the true/false route), **drag a step to reposition** it (its connections follow
+and the position is saved), select a step to configure its parameters, **Save**
+the automation (stored durably), reopen it later (`/?def=<id>`), and **Run** it
+with a single click — watching each step's status update live and inspecting any
+step's output.
 
 Driven-browser checks (require Google Chrome installed; each writes screenshots
 to `SHOT_DIR` and exits non-zero on any failed assertion):

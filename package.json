@@ -15,7 +15,9 @@
     "e2e:import-mixed": "node e2e/import-mixed.mjs",
     "e2e:roundtrip": "node e2e/roundtrip.mjs",
     "e2e:history": "node e2e/history.mjs",
-    "e2e:inspect": "node e2e/inspect.mjs"
+    "e2e:inspect": "node e2e/inspect.mjs",
+    "e2e:drag-connect": "node e2e/drag-connect.mjs",
+    "e2e:drag-move": "node e2e/drag-move.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",

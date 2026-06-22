@@ -73,16 +73,90 @@ function armConnection(from, port) {
   state.arm = { from, port };
   render();
 }
-function completeConnection(toId) {
-  if (!state.arm || state.arm.from === toId) {
-    state.arm = null;
-    render();
-    return;
-  }
-  state.connections.push({ id: 'c' + (state.counter += 1), from: state.arm.from, to: toId, port: state.arm.port });
-  state.arm = null;
+function connect(fromId, port, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  state.connections.push({ id: 'c' + (state.counter += 1), from: fromId, to: toId, port });
   render();
 }
+function completeConnection(toId) {
+  if (!state.arm || state.arm.from === toId) { state.arm = null; render(); return; }
+  connect(state.arm.from, state.arm.port, toId);
+  state.arm = null;
+}
+
+// ---- pointer drag: connect (B27) and move (B28) ----
+const DRAG_THRESHOLD = 4;
+function canvasXY(ev) {
+  const r = canvas.getBoundingClientRect();
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+}
+// Recompute link + delete-button positions without rebuilding nodes (so an
+// in-progress drag isn't interrupted).
+function updateLinks() {
+  for (const c of state.connections) {
+    const from = nodeById(c.from), to = nodeById(c.to);
+    if (!from || !to) continue;
+    const a = portPoint(from, c.port), b = nodeInPoint(to);
+    const line = svg.querySelector(`line[data-conn-id="${c.id}"]`);
+    if (line) { line.setAttribute('x1', a.x); line.setAttribute('y1', a.y); line.setAttribute('x2', b.x); line.setAttribute('y2', b.y); }
+    const del = canvas.querySelector(`.conn-del[data-conn-id="${c.id}"]`);
+    if (del) { del.style.left = (a.x + b.x) / 2 + 'px'; del.style.top = (a.y + b.y) / 2 + 'px'; }
+  }
+}
+
+function startConnectDrag(fromId, port, ev) {
+  const start = canvasXY(ev);
+  const a = portPoint(nodeById(fromId), port);
+  const temp = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  temp.setAttribute('id', 'temp-line'); temp.setAttribute('x1', a.x); temp.setAttribute('y1', a.y);
+  temp.setAttribute('x2', a.x); temp.setAttribute('y2', a.y);
+  temp.setAttribute('stroke', '#4c6ef5'); temp.setAttribute('stroke-width', '2'); temp.setAttribute('stroke-dasharray', '5,4');
+  svg.appendChild(temp);
+  state.drag = { mode: 'connect', from: fromId, port, start, moved: false };
+}
+function startNodeDrag(nodeId, ev) {
+  const n = nodeById(nodeId);
+  state.drag = { mode: 'move', nodeId, start: canvasXY(ev), origX: n.x, origY: n.y, moved: false };
+}
+
+document.addEventListener('mousemove', (ev) => {
+  const d = state.drag;
+  if (!d) return;
+  const p = canvasXY(ev);
+  if (d.mode === 'connect') {
+    if (Math.abs(p.x - d.start.x) > DRAG_THRESHOLD || Math.abs(p.y - d.start.y) > DRAG_THRESHOLD) d.moved = true;
+    const temp = svg.querySelector('#temp-line');
+    if (temp) { temp.setAttribute('x2', p.x); temp.setAttribute('y2', p.y); }
+  } else if (d.mode === 'move') {
+    const dx = p.x - d.start.x, dy = p.y - d.start.y;
+    if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) d.moved = true;
+    const n = nodeById(d.nodeId);
+    n.x = Math.max(0, d.origX + dx); n.y = Math.max(0, d.origY + dy);
+    const el = canvas.querySelector(`.node[data-node-id="${d.nodeId}"]`);
+    if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
+    updateLinks();
+  }
+});
+
+document.addEventListener('mouseup', (ev) => {
+  const d = state.drag;
+  if (!d) return;
+  state.drag = null;
+  if (d.mode === 'connect') {
+    const temp = svg.querySelector('#temp-line');
+    if (temp) temp.remove();
+    // Forgiving target: drop anywhere on the target node's body.
+    const overNode = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.node');
+    if (d.moved && overNode) {
+      connect(d.from, d.port, overNode.dataset.nodeId); // drag-connect
+    } else if (!d.moved) {
+      armConnection(d.from, d.port); // click (no drag) falls back to arm-then-click
+    }
+  } else if (d.mode === 'move') {
+    if (d.moved) render(); // finalize layout (positions already in state.nodes)
+    else { if (state.arm) completeConnection(d.nodeId); else selectNode(d.nodeId); } // click = select/complete
+  }
+});
 function deleteConnection(connId) {
   state.connections = state.connections.filter((c) => c.id !== connId);
   render();
@@ -135,15 +209,17 @@ function render() {
       pe.dataset.testid = 'port';
       pe.dataset.nodeId = n.id;
       pe.dataset.port = p;
-      pe.title = 'connect from ' + p;
+      pe.title = 'drag from ' + p + ' to a target step';
       pe.textContent = p === 'true' ? 'T' : p === 'false' ? 'F' : '→';
-      pe.addEventListener('click', (ev) => { ev.stopPropagation(); armConnection(n.id, p); });
+      pe.addEventListener('mousedown', (ev) => { ev.stopPropagation(); ev.preventDefault(); startConnectDrag(n.id, p, ev); });
       ports.appendChild(pe);
     }
     el.appendChild(ports);
-    el.addEventListener('click', () => {
-      if (state.arm) completeConnection(n.id);
-      else selectNode(n.id);
+    // Drag the node body to MOVE it (B28); a click (no drag) selects/completes.
+    el.addEventListener('mousedown', (ev) => {
+      if (ev.target.closest('.port') || ev.target.closest('.conn-del')) return;
+      ev.preventDefault();
+      startNodeDrag(n.id, ev);
     });
     canvas.appendChild(el);
   }
@@ -157,6 +233,7 @@ function render() {
     line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
     line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
     line.dataset.testid = 'conn-line';
+    line.dataset.connId = c.id;
     svg.appendChild(line);
     const del = document.createElement('button');
     del.className = 'conn-del';
