@@ -15,6 +15,7 @@ import {
   topologicalOrder,
   evaluateCondition,
   reachableFrom,
+  getPath,
 } from './graph';
 
 export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
@@ -119,6 +120,13 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       return { main: input.filter((item) => evaluateCondition(node.params.condition as Condition, item)) };
     case 'merge':
       return { main: input };
+    case 'aggregate': {
+      // Collapse MANY items into ONE, collecting the chosen field's values.
+      const field = String((node.params as any).field ?? 'json.value');
+      const outName = String((node.params as any).outputName ?? 'values');
+      const values = input.map((it) => getPath(it, field));
+      return { main: [{ json: { [outName]: values }, binary: {} }] };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

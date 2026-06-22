@@ -18,7 +18,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 5 | Wait | ✅ satisfied | seed → Wait(2500ms) → sink; measured 2807ms pause | `wait/wait-pausing.png`, `wait/wait-success.png` |
 | 6 | No Operation | ✅ satisfied | seed([3,1,1,2] unsorted+dup) → No-Op → sink | `no-operation/noop-success.png` |
 | 7 | Stop and Error | ✅ satisfied | reached→FAIL w/ message (downstream skipped); not-reached→completes | `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png` |
-| 8 | Execute Sub-workflow | _pending_ | — | — |
+| 8 | Execute Sub-workflow | ✅ satisfied | save "Doubler" sub; parent seed(5)→ExecuteSub→sink ⇒ 10 | `execute-sub-workflow/execute-sub-success.png` |
 | 9 | Aggregate | _pending_ | — | — |
 | 10 | Split Out | _pending_ | — | — |
 | 11 | Sort | _pending_ | — | — |
@@ -76,3 +76,12 @@ and saved a screenshot of the **successful run** here for you to double-check.
   - **Not reached:** seed(value 5) → IF(value>100) → [true] Stop and Error / [false] sink. False branch taken → run **completed** normally, Stop and Error `skipped`, no spurious failure.
 - Screenshots: `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png`. Demo: `stop-and-error/demo.mjs`.
 - Assumptions: none. (Note: for this node a *failed* run is the correct/successful outcome — that's the node doing its job.)
+
+### Node 8 — Execute Sub-workflow ✅ (completes the FLOW group)
+- Sample: saved a sub-workflow **"Doubler (review demo)"** (a code step that doubles `value`). Then built a parent: seed(`value:5`) → **Execute Sub-workflow** (selected Doubler from the dropdown) → sink. Ran on the real engine; run **completed**.
+- Verified: the parent's downstream received **`value: 10`** (5 doubled) — proving the referenced separate automation genuinely ran and its result flowed back into the parent (not a stub). Screenshot shows the completed parent run with the doubled value.
+- Screenshot: `execute-sub-workflow/execute-sub-success.png`. Demo: `execute-sub-workflow/demo.mjs`.
+- Assumptions: created my own "Doubler (review demo)" definition to call (left saved in the store for your inspection).
+
+---
+**FLOW group complete** (nodes 1–8: Switch, Filter, Merge, Loop Over Items, Wait, No Operation, Stop and Error, Execute Sub-workflow). Proceeding to the DATA group (9–17).

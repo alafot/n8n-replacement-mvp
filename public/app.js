@@ -6,6 +6,7 @@
 const STEP_TYPES = [
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
+  { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -47,6 +48,7 @@ function defaultParams(type) {
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
   if (type === 'merge') return { mode: 'append' };
+  if (type === 'aggregate') return { field: 'json.value', outputName: 'values' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -472,6 +474,13 @@ function renderConfig() {
     fetch('/definitions').then((r) => r.json()).then((list) => {
       for (const d of list) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name + ' (' + d.id.slice(0, 12) + '…)'; if (n.params.definitionId === d.id) o.selected = true; sel.appendChild(o); }
     }).catch(() => {});
+  } else if (n.type === 'aggregate') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Collapses many items into one; the output field holds all the collected values.';
+    c.appendChild(note);
+    n.params.field = n.params.field ?? 'json.value';
+    n.params.outputName = n.params.outputName ?? 'values';
+    c.appendChild(field('Field to aggregate (path)', 'cfg-agg-field', input(n.params.field, (v) => (n.params.field = v))));
+    c.appendChild(field('Output field name', 'cfg-agg-output', input(n.params.outputName, (v) => (n.params.outputName = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }
