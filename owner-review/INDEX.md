@@ -20,7 +20,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 7 | Stop and Error | ✅ satisfied | reached→FAIL w/ message (downstream skipped); not-reached→completes | `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png` |
 | 8 | Execute Sub-workflow | ✅ satisfied | save "Doubler" sub; parent seed(5)→ExecuteSub→sink ⇒ 10 | `execute-sub-workflow/execute-sub-success.png` |
 | 9 | Aggregate | ✅ satisfied | seed(amount 10,20,30) → Aggregate ⇒ one item {amounts:[10,20,30]} | `aggregate/aggregate-success.png` |
-| 10 | Split Out | _pending_ | — | — |
+| 10 | Split Out | ✅ satisfied | seed{tags:[a,b,c]} → Split Out ⇒ 3 items (a/b/c) | `split-out/split-out-success.png` |
 | 11 | Sort | _pending_ | — | — |
 | 12 | Limit | _pending_ | — | — |
 | 13 | Remove Duplicates | _pending_ | — | — |
@@ -91,3 +91,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the 3 items collapsed into **exactly one** output item `{amounts:[10,20,30]}` — every input value present, none missing/invented — and downstream received that single aggregated item.
 - Screenshot: `aggregate/aggregate-success.png`. Demo: `aggregate/demo.mjs`.
 - Assumptions: aggregated a single numeric field (`amount`) into a list; the node also supports choosing the output field name (used `amounts`).
+
+### Node 10 — Split Out ✅
+- Sample: seed (one item `{tags:['a','b','c']}`) → **Split Out** (field `json.tags` → output `tag`) → sink. Ran on the real engine; run **completed**.
+- Verified: the single item expanded into **3 items** `{tag:a}/{tag:b}/{tag:c}` — one element per item, in order, none missing/duplicated — and downstream received all 3. True inverse of Aggregate.
+- Screenshot: `split-out/split-out-success.png`. Demo: `split-out/demo.mjs`.
+- Assumptions: split a string list (`tags`) placing each element on field `tag`.

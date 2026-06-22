@@ -139,6 +139,19 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       }
       return { main: out };
     }
+    case 'sort': {
+      // Reorder items by the chosen field/direction, preserving the item set.
+      const field = String((node.params as any).field ?? 'json.value');
+      const dir = (node.params as any).direction === 'desc' ? -1 : 1;
+      const sorted = [...input].sort((x, y) => {
+        const a = getPath(x, field), b = getPath(y, field);
+        let cmp: number;
+        if (typeof a === 'number' && typeof b === 'number') cmp = a - b;
+        else cmp = String(a).localeCompare(String(b));
+        return cmp * dir;
+      });
+      return { main: sorted };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };
