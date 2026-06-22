@@ -19,7 +19,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 6 | No Operation | ✅ satisfied | seed([3,1,1,2] unsorted+dup) → No-Op → sink | `no-operation/noop-success.png` |
 | 7 | Stop and Error | ✅ satisfied | reached→FAIL w/ message (downstream skipped); not-reached→completes | `stop-and-error/stop-error-failed.png`, `stop-and-error/stop-error-not-reached.png` |
 | 8 | Execute Sub-workflow | ✅ satisfied | save "Doubler" sub; parent seed(5)→ExecuteSub→sink ⇒ 10 | `execute-sub-workflow/execute-sub-success.png` |
-| 9 | Aggregate | _pending_ | — | — |
+| 9 | Aggregate | ✅ satisfied | seed(amount 10,20,30) → Aggregate ⇒ one item {amounts:[10,20,30]} | `aggregate/aggregate-success.png` |
 | 10 | Split Out | _pending_ | — | — |
 | 11 | Sort | _pending_ | — | — |
 | 12 | Limit | _pending_ | — | — |
@@ -85,3 +85,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 
 ---
 **FLOW group complete** (nodes 1–8: Switch, Filter, Merge, Loop Over Items, Wait, No Operation, Stop and Error, Execute Sub-workflow). Proceeding to the DATA group (9–17).
+
+### Node 9 — Aggregate ✅
+- Sample: seed (3 items, `amount` 10/20/30) → **Aggregate** (field `json.amount` → output `amounts`) → sink. Ran on the real engine; run **completed**.
+- Verified: the 3 items collapsed into **exactly one** output item `{amounts:[10,20,30]}` — every input value present, none missing/invented — and downstream received that single aggregated item.
+- Screenshot: `aggregate/aggregate-success.png`. Demo: `aggregate/demo.mjs`.
+- Assumptions: aggregated a single numeric field (`amount`) into a list; the node also supports choosing the output field name (used `amounts`).

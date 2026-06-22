@@ -127,6 +127,18 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       const values = input.map((it) => getPath(it, field));
       return { main: [{ json: { [outName]: values }, binary: {} }] };
     }
+    case 'splitOut': {
+      // Inverse of aggregate: expand each item's list field into one item per element.
+      const field = String((node.params as any).field ?? 'json.values');
+      const outName = String((node.params as any).outputName ?? 'value');
+      const out: Items = [];
+      for (const it of input) {
+        const v = getPath(it, field);
+        const arr = Array.isArray(v) ? v : v === undefined ? [] : [v];
+        for (const el of arr) out.push({ json: { [outName]: el as any }, binary: {} });
+      }
+      return { main: out };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };
