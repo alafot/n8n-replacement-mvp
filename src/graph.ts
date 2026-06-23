@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'htmlExtract' | 'xml' | 'markdown' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait' | 'noop' | 'stopError' | 'executeSubworkflow' | 'aggregate' | 'splitOut' | 'sort' | 'limit' | 'removeDuplicates' | 'renameKeys' | 'dateTime' | 'summarize' | 'compareDatasets' | 'scheduleTrigger' | 'webhookTrigger' | 'respondToWebhook' | 'formTrigger' | 'errorTrigger';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'htmlExtract' | 'xml' | 'markdown' | 'crypto' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait' | 'noop' | 'stopError' | 'executeSubworkflow' | 'aggregate' | 'splitOut' | 'sort' | 'limit' | 'removeDuplicates' | 'renameKeys' | 'dateTime' | 'summarize' | 'compareDatasets' | 'scheduleTrigger' | 'webhookTrigger' | 'respondToWebhook' | 'formTrigger' | 'errorTrigger';
 
 /** Node ids reachable forward from any of `starts` (following connections). */
 export function reachableFrom(def: GraphDefinition, starts: string[]): Set<string> {

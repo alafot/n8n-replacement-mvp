@@ -202,7 +202,7 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 |---|------|--------|-----------------|------------|
 | D1 | HTML Extract | ✅ satisfied | seed(html) → Extract (h1→title, a@href→link) ⇒ Hello / /x | `html-extract/html-extract-success.png` |
 | D2 | XML | ✅ satisfied | seed(xml) → XML→JSON ⇒ {order:{$:{id:7},item:book}} | `xml/xml-success.png` |
-| D3 | Markdown | _pending_ | — | — |
+| D3 | Markdown | ✅ satisfied | seed(md) → MD→HTML ⇒ `<h1>Hello</h1>…<strong>bold</strong>` | `markdown/markdown-success.png` |
 | D4 | Crypto | _pending_ | — | — |
 | D5 | GraphQL | _pending_ | — | — |
 | D6 | RSS Read | _pending_ | — | — |
@@ -216,6 +216,11 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 - Sample: seed (`{xml:'<order id="7"><item>book</item></order>'}`) → **XML** (XML→JSON, → `parsed`) → sink. Run **completed**.
 - Verified (known input → expected): parsed to navigable JSON `{order:{$:{id:"7"},item:"book"}}` — id `7` and item text `book` both present; source preserved. Committed + pushed to the remote.
 - Screenshot: `xml/xml-success.png`. Demo: `xml/demo.mjs`.
+
+### Phase D · D3 — Markdown ✅
+- Sample: seed (`{md:'# Hello\n\nsome **bold** text'}`) → **Markdown** (MD→HTML, → `html`) → sink. Run **completed**.
+- Verified (known input → expected): `<h1>Hello</h1>\n<p>some <strong>bold</strong> text</p>` — heading and emphasis converted; source preserved. Committed + pushed.
+- Screenshot: `markdown/markdown-success.png`. Demo: `markdown/demo.mjs`.
 
 ## Post-review fixes
 

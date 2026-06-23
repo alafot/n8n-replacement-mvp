@@ -3,6 +3,7 @@
 // caller-configurable HTTP Request step (B2).
 
 import * as vm from 'vm';
+import * as crypto from 'crypto';
 import { Items, Item, makeItem, BinaryDatum } from './itemFormat';
 import { getPath } from './graph';
 
@@ -516,6 +517,40 @@ export function jsonToXml(obj: any): string {
     return Object.entries(obj).map(([k, v]) => buildXml(k, v)).join('');
   }
   return buildXml('root', obj);
+}
+
+// ---- Crypto step (B58) -------------------------------------------------------
+// Perform a cryptographic operation on a field. Hashing (md5/sha1/sha256/sha512)
+// uses Node's crypto and is deterministic (same input -> same digest), plus
+// base64 encode/decode for breadth.
+
+export interface CryptoInput {
+  /** 'hash' | 'base64Encode' | 'base64Decode'. */
+  action: string;
+  /** Hash algorithm when action is 'hash' (md5/sha1/sha256/sha512). */
+  algorithm?: string;
+  /** Dot-path to the source value on each item (e.g. 'json.value'). */
+  sourceField: string;
+  /** Field name to write the result into on each item's json. */
+  outputName: string;
+  /** The items received from upstream. */
+  input: Items;
+}
+
+export async function cryptoOp(args: CryptoInput): Promise<Items> {
+  const action = args.action || 'hash';
+  const algorithm = (args.algorithm || 'sha256').toLowerCase();
+  return args.input.map((item): Item => {
+    const json: Record<string, unknown> = { ...item.json };
+    const raw = getPath(item, args.sourceField);
+    const value = raw == null ? '' : String(raw);
+    let result: string;
+    if (action === 'base64Encode') result = Buffer.from(value, 'utf8').toString('base64');
+    else if (action === 'base64Decode') result = Buffer.from(value, 'base64').toString('utf8');
+    else result = crypto.createHash(algorithm).update(value, 'utf8').digest('hex');
+    json[args.outputName] = result;
+    return makeItem(json, { ...item.binary });
+  });
 }
 
 // ---- Markdown step (B57) -----------------------------------------------------
