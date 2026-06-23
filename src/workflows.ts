@@ -261,6 +261,19 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       if (wp._query && Object.keys(wp._query).length) json._query = wp._query;
       return { main: [{ json, binary: {} }] };
     }
+    case 'respondToWebhook': {
+      // Build the HTTP response (status + body) for the webhook caller. The body
+      // can carry automation-derived data (the first incoming item) or a static value.
+      const p = node.params as any;
+      const status = Number(p.status) || 200;
+      let body: unknown;
+      if (p.bodyMode === 'static') {
+        try { body = JSON.parse(String(p.staticBody ?? '{}')); } catch { body = String(p.staticBody ?? ''); }
+      } else {
+        body = input[0]?.json ?? {};
+      }
+      return { main: [{ json: { status, body }, binary: {} }] };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

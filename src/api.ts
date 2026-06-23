@@ -299,6 +299,18 @@ async function main(): Promise<void> {
         wt.params._payload = request.body && typeof request.body === 'object' ? request.body : {};
         wt.params._query = request.query ?? {};
         const runId = await startGraphRun(graph as GraphDef, def.name, def.id);
+        // If the automation has a Respond to Webhook step, wait for the run and
+        // return the custom status + body it built (B51); else a default ack (B50).
+        const respondNode = (graph.nodes as any[]).find((n) => n.type === 'respondToWebhook');
+        if (respondNode) {
+          const handle = client.workflow.getHandle(runId);
+          try { await handle.result(); } catch { /* run failed — fall through */ }
+          await refreshRun(runId);
+          let resp: any;
+          try { resp = (await handle.query(getStepsQuery))[respondNode.id]?.output?.[0]?.json; } catch { /* ignore */ }
+          if (resp && typeof resp.status === 'number') return reply.code(resp.status).send(resp.body);
+          return reply.code(502).send({ error: 'webhook automation produced no response' });
+        }
         return reply.code(202).send({ fired: true, runId, definitionId: def.id });
       }
       return reply.code(404).send({ fired: false, error: `no webhook registered for path '${wpath}'` });

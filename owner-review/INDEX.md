@@ -29,7 +29,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 16 | Summarize | ✅ satisfied | seed[A:10,B:5,A:7] → sum group by cat ⇒ A=17,B=5 | `summarize/summarize-success.png` |
 | 17 | Compare Datasets | ✅ satisfied | A[1,2,3] vs B[2,3,4] ⇒ matched[2,3]/onlyA[1]/onlyB[4] | `compare-datasets/compare-datasets-success.png` |
 | 18 | Schedule (trigger) | ✅ satisfied | Schedule(0.5s)→sink; started ⇒ 6 real runs in history | `schedule-trigger/schedule-trigger-success.png` |
-| 19 | Webhook (trigger) | _pending_ | — | — |
+| 19 | Webhook (trigger) | ✅ satisfied | POST /webhook/review-hook ⇒ run fired, payload {order:123} downstream | `webhook-trigger/webhook-trigger-success.png` |
 | 20 | Respond to Webhook | _pending_ | — | — |
 | 21 | Form (trigger) | _pending_ | — | — |
 | 22 | Error Trigger | _pending_ | — | — |
@@ -152,3 +152,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the schedule genuinely initiated runs as the entry point — **6 real runs** recorded in History (all `completed`), governed by the configured interval (examiner separately confirmed shorter interval → more fires). Persists across save/reload; acts as a starting step (no incoming connection).
 - Screenshot: `schedule-trigger/schedule-trigger-success.png` (History showing the scheduled runs + the trigger's Start/Stop controls). Demo: `schedule-trigger/demo.mjs`.
 - Assumptions: execution model = live timer (implementer's choice, see flag above); demoed at 0.5s and stopped it after ~2.8s.
+
+### Node 19 — Webhook (trigger) ✅
+- Sample: **Webhook trigger** (path `review-hook`, live URL `/webhook/review-hook`) → sink. Saved, then sent a real `POST /webhook/review-hook` with body `{order:123, kind:'review'}`.
+- Verified: the request genuinely fired a durable run (HTTP 202, runId returned), and the downstream step received exactly `{order:123, kind:'review'}`. A request to an unregistered path returns **404** with no run. Path persists across save/reload; entry point (no incoming connection).
+- Screenshot: `webhook-trigger/webhook-trigger-success.png` (the saved automation showing the live Listening URL). Demo: `webhook-trigger/demo.mjs`.
+- Assumptions: live HTTP endpoint (consistent with the live trigger model).

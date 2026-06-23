@@ -26,6 +26,7 @@ const STEP_TYPES = [
   { type: 'noop', label: 'No operation', hint: 'No-Op', category: 'Flow', icon: '➡️', desc: 'A no-op: passes items straight through unchanged.' },
   { type: 'stopError', label: 'Stop and error', hint: 'Stop And Error', category: 'Flow', icon: '🛑', desc: 'Deliberately fail the run with a custom error message, aborting downstream.' },
   { type: 'executeSubworkflow', label: 'Execute sub-workflow', hint: 'Execute Workflow', category: 'Actions', icon: '📦', desc: 'Run another saved automation as a step, feeding it these items and returning its results.' },
+  { type: 'respondToWebhook', label: 'Respond to webhook', hint: 'Respond to Webhook', category: 'Actions', icon: '↩️', desc: 'Send a custom HTTP response (status + body) back to the webhook caller.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
@@ -69,6 +70,7 @@ function defaultParams(type) {
   if (type === 'compareDatasets') return { keyField: 'json.id' };
   if (type === 'scheduleTrigger') return { intervalSeconds: 1 };
   if (type === 'webhookTrigger') return { path: 'hook' };
+  if (type === 'respondToWebhook') return { status: 200, bodyMode: 'firstItem', staticBody: '{}' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -645,6 +647,20 @@ function renderConfig() {
     c.appendChild(field('Path', 'cfg-webhook-path', input(n.params.path, (v) => { n.params.path = v; refreshUrl(); })));
     urlEl.readOnly = true; refreshUrl();
     c.appendChild(field('Listening URL', 'webhook-url', urlEl));
+  } else if (n.type === 'respondToWebhook') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Sends the HTTP response to the webhook caller (use downstream of a Webhook trigger).';
+    c.appendChild(note);
+    n.params.status = n.params.status ?? 200;
+    n.params.bodyMode = n.params.bodyMode ?? 'firstItem';
+    const st = input(String(n.params.status), (v) => { n.params.status = Number(v) || 200; }); st.type = 'number';
+    c.appendChild(field('Status code', 'cfg-respond-status', st));
+    const sel = document.createElement('select');
+    for (const m of ['firstItem', 'static']) { const o = document.createElement('option'); o.value = m; o.textContent = m === 'firstItem' ? "First item's data" : 'Static JSON'; if (n.params.bodyMode === m) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.bodyMode = sel.value; render(); });
+    c.appendChild(field('Body', 'cfg-respond-bodymode', sel));
+    if (n.params.bodyMode === 'static') {
+      c.appendChild(field('Static body (JSON)', 'cfg-respond-body', textarea(n.params.staticBody ?? '{}', (v) => (n.params.staticBody = v))));
+    }
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

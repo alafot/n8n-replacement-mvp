@@ -144,7 +144,9 @@ Schedule trigger is an entry-point step that fires real runs on a configured
 interval (`POST /definitions/:id/schedule/start` | `/stop`, or the Start/Stop
 buttons in its config). The Webhook trigger is an entry-point step that fires a
 run carrying the request payload when an HTTP request hits its path — send a
-request to `/webhook/<path>` (the automation must be saved).
+request to `/webhook/<path>` (the automation must be saved). The Respond to
+Webhook step (used downstream of a Webhook trigger) sends a custom HTTP status +
+body back to the caller, so the webhook request returns the automation's result.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by
