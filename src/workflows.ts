@@ -172,6 +172,19 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       }
       return { main: out };
     }
+    case 'renameKeys': {
+      // Rename specified fields (old -> new), preserving values and other fields.
+      const renames = ((node.params as any).renames ?? {}) as Record<string, string>;
+      return {
+        main: input.map((it) => {
+          const json: Record<string, unknown> = { ...it.json };
+          for (const [oldK, newK] of Object.entries(renames)) {
+            if (oldK in json) { json[newK] = json[oldK]; delete json[oldK]; }
+          }
+          return { json, binary: it.binary };
+        }),
+      };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

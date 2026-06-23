@@ -133,7 +133,9 @@ from many items into a single item carrying the collected array. The Split Out
 step is the inverse: it expands an item's list field into one item per element.
 The Sort step reorders items by a chosen field, ascending or descending. The
 Limit step caps how many items pass through (keep first or last N). The Remove
-Duplicates step keeps only distinct items (by a key field or whole item).
+Duplicates step keeps only distinct items (by a key field or whole item). The
+Rename Keys step renames fields (old → new) while preserving values and other
+fields.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

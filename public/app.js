@@ -11,6 +11,7 @@ const STEP_TYPES = [
   { type: 'sort', label: 'Sort', hint: 'Sort', category: 'Transform', icon: '↕️', desc: 'Reorder items by a chosen field, ascending or descending.' },
   { type: 'limit', label: 'Limit', hint: 'Limit', category: 'Transform', icon: '🔢', desc: 'Cap how many items pass through, keeping at most N.' },
   { type: 'removeDuplicates', label: 'Remove duplicates', hint: 'Remove Duplicates', category: 'Transform', icon: '🧹', desc: 'Drop duplicate items, keeping only the distinct ones.' },
+  { type: 'renameKeys', label: 'Rename keys', hint: 'Rename Keys', category: 'Transform', icon: '🏷️', desc: 'Rename fields (old name → new name), preserving values and other fields.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -57,6 +58,7 @@ function defaultParams(type) {
   if (type === 'sort') return { field: 'json.value', direction: 'asc' };
   if (type === 'limit') return { max: 1, keep: 'first' };
   if (type === 'removeDuplicates') return { by: 'field', field: 'json.id' };
+  if (type === 'renameKeys') return { renames: { first: 'name' } };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -522,6 +524,11 @@ function renderConfig() {
     sel.addEventListener('change', () => { n.params.by = sel.value; });
     c.appendChild(field('Compare', 'cfg-dedup-by', sel));
     c.appendChild(field('Key field (path, when "By key field")', 'cfg-dedup-field', input(n.params.field, (v) => (n.params.field = v))));
+  } else if (n.type === 'renameKeys') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Rename fields (old → new); values and other fields are preserved.';
+    c.appendChild(note);
+    n.params.renames = n.params.renames || {};
+    c.appendChild(field('Rename mappings (JSON: "old":"new")', 'cfg-renames', textarea(jsonStr(n.params.renames), (v) => (n.params.renames = parseJsonSafe(v, n.params.renames)))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

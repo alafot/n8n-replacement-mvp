@@ -34,7 +34,8 @@
     "e2e:split-out": "node e2e/split-out.mjs",
     "e2e:sort": "node e2e/sort.mjs",
     "e2e:limit": "node e2e/limit.mjs",
-    "e2e:remove-duplicates": "node e2e/remove-duplicates.mjs"
+    "e2e:remove-duplicates": "node e2e/remove-duplicates.mjs",
+    "e2e:rename-keys": "node e2e/rename-keys.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",

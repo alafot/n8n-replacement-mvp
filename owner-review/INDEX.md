@@ -23,7 +23,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 10 | Split Out | ✅ satisfied | seed{tags:[a,b,c]} → Split Out ⇒ 3 items (a/b/c) | `split-out/split-out-success.png` |
 | 11 | Sort | ✅ satisfied | seed[3,1,2,1] → Sort(asc) ⇒ [1,1,2,3] | `sort/sort-success.png` |
 | 12 | Limit | ✅ satisfied | seed(5 items) → Limit(max 2, first) ⇒ [1,2] | `limit/limit-success.png` |
-| 13 | Remove Duplicates | _pending_ | — | — |
+| 13 | Remove Duplicates | ✅ satisfied | seed ids[1,2,2,3,1] → Remove Dups ⇒ [1,2,3] | `remove-duplicates/remove-duplicates-success.png` |
 | 14 | Rename Keys | _pending_ | — | — |
 | 15 | Date & Time | _pending_ | — | — |
 | 16 | Summarize | _pending_ | — | — |
@@ -109,3 +109,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: only **2** items continued downstream — the first two (`n:1, n:2`) in order. (Examiner also confirmed keep-last keeps the last 2, and that fewer-than-N items all pass through unchanged.)
 - Screenshot: `limit/limit-success.png`. Demo: `limit/demo.mjs`.
 - Assumptions: demoed keep-first with max 2; the node also offers keep-last.
+
+### Node 13 — Remove Duplicates ✅
+- Sample: seed (ids `[1,2,2,3,1]`) → **Remove Duplicates** (compare: by key field `json.id`) → sink. Ran on the real engine; run **completed**.
+- Verified: only distinct items continued — `[1,2,3]`, first occurrence kept in original order — and downstream received the 3 de-duplicated items. (Examiner also confirmed whole-item compare and the no-duplicates pass-through case.)
+- Screenshot: `remove-duplicates/remove-duplicates-success.png`. Demo: `remove-duplicates/demo.mjs`.
+- Assumptions: demoed by-key-field on `id`; the node also offers whole-item comparison.
