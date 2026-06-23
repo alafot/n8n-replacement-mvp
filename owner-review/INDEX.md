@@ -200,12 +200,17 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 
 | # | Node | Status | Sample workflow | Screenshot |
 |---|------|--------|-----------------|------------|
-| D1 | HTML Extract | _pending_ | — | — |
+| D1 | HTML Extract | ✅ satisfied | seed(html) → Extract (h1→title, a@href→link) ⇒ Hello / /x | `html-extract/html-extract-success.png` |
 | D2 | XML | _pending_ | — | — |
 | D3 | Markdown | _pending_ | — | — |
 | D4 | Crypto | _pending_ | — | — |
 | D5 | GraphQL | _pending_ | — | — |
 | D6 | RSS Read | _pending_ | — | — |
+
+### Phase D · D1 — HTML Extract ✅
+- Sample: seed (item holding `<h1>Hello</h1><a href="/x">link</a>`) → **HTML Extract** (rule `h1`→text→`title`, rule `a`→attribute `href`→`link`) → sink. Run **completed**.
+- Verified (known input → expected): `title="Hello"`, `link="/x"`, source field preserved. Builder confirmed commit + push to the remote (full branch pushed, remote main at this commit).
+- Screenshot: `html-extract/html-extract-success.png`. Demo: `html-extract/demo.mjs`.
 
 ## Post-review fixes
 

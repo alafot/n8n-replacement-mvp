@@ -396,3 +396,143 @@ export async function extractHtml(args: HtmlExtractInput): Promise<Items> {
     return makeItem(json, { ...item.binary });
   });
 }
+
+// ---- XML step (B56) ----------------------------------------------------------
+// Convert between XML and JSON. XML->JSON genuinely parses an XML string into an
+// accessible JSON structure; JSON->XML serialises the inverse. The JSON shape
+// follows the common convention: attributes collected under `$`, element text
+// as the value (or under `_` when an element has both attributes and text),
+// repeated child tags become arrays.
+
+export interface XmlConvertInput {
+  /** Dot-path to the source string/object on each item (e.g. 'json.body'). */
+  sourceField: string;
+  /** 'xmlToJson' = parse XML into JSON; 'jsonToXml' = serialise JSON into XML. */
+  direction: 'xmlToJson' | 'jsonToXml';
+  /** Field name to write the conversion result into on each item's json. */
+  outputName: string;
+  /** The items received from upstream. */
+  input: Items;
+}
+
+interface XmlEl { tag: string; attribs: Record<string, string>; children: XmlEl[]; text: string; }
+
+function parseXmlTag(inner: string): { tag: string; attribs: Record<string, string> } {
+  const m = inner.match(/^\s*([a-zA-Z_][\w:.\-]*)/);
+  const tag = m ? m[1] : '';
+  const attribs: Record<string, string> = {};
+  const rest = inner.slice(m ? m[0].length : 0);
+  const re = /([^\s=\/]+)(\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'`=<>]+)))?/g;
+  let a: RegExpExecArray | null;
+  while ((a = re.exec(rest))) {
+    if (!a[1]) break;
+    let val = '';
+    if (a[2] !== undefined) val = a[4] !== undefined ? a[4] : a[5] !== undefined ? a[5] : (a[6] ?? '');
+    attribs[a[1]] = decodeEntities(val);
+  }
+  return { tag, attribs };
+}
+
+function parseXmlTree(xml: string): XmlEl {
+  const root: XmlEl = { tag: '#root', attribs: {}, children: [], text: '' };
+  const stack: XmlEl[] = [root];
+  const top = () => stack[stack.length - 1];
+  let i = 0;
+  const n = xml.length;
+  while (i < n) {
+    const lt = xml.indexOf('<', i);
+    if (lt === -1) { top().text += xml.slice(i); break; }
+    if (lt > i) top().text += xml.slice(i, lt);
+    if (xml.startsWith('<![CDATA[', lt)) { const end = xml.indexOf(']]>', lt + 9); top().text += xml.slice(lt + 9, end === -1 ? n : end); i = end === -1 ? n : end + 3; continue; }
+    if (xml.startsWith('<!--', lt)) { const end = xml.indexOf('-->', lt + 4); i = end === -1 ? n : end + 3; continue; }
+    if (xml[lt + 1] === '?' || xml[lt + 1] === '!') { const end = xml.indexOf('>', lt); i = end === -1 ? n : end + 1; continue; }
+    if (xml[lt + 1] === '/') {
+      const end = xml.indexOf('>', lt);
+      const name = xml.slice(lt + 2, end === -1 ? n : end).trim();
+      for (let s = stack.length - 1; s >= 1; s--) { if (stack[s].tag === name) { stack.length = s; break; } }
+      i = end === -1 ? n : end + 1;
+      continue;
+    }
+    const end = xml.indexOf('>', lt);
+    if (end === -1) { top().text += xml.slice(lt); break; }
+    let inner = xml.slice(lt + 1, end);
+    let selfClose = false;
+    if (inner.endsWith('/')) { selfClose = true; inner = inner.slice(0, -1); }
+    const { tag, attribs } = parseXmlTag(inner);
+    if (!tag) { i = end + 1; continue; }
+    const el: XmlEl = { tag, attribs, children: [], text: '' };
+    top().children.push(el);
+    if (!selfClose) stack.push(el);
+    i = end + 1;
+  }
+  return root;
+}
+
+function addChild(obj: Record<string, any>, key: string, value: any): void {
+  if (key in obj) {
+    if (Array.isArray(obj[key])) obj[key].push(value);
+    else obj[key] = [obj[key], value];
+  } else obj[key] = value;
+}
+
+function elementValue(el: XmlEl): any {
+  const hasAttribs = Object.keys(el.attribs).length > 0;
+  const hasChildren = el.children.length > 0;
+  const text = decodeEntities(el.text).trim();
+  if (!hasAttribs && !hasChildren) return text; // pure-text (or empty) element -> its text
+  const obj: Record<string, any> = {};
+  if (hasAttribs) obj['$'] = { ...el.attribs };
+  for (const child of el.children) addChild(obj, child.tag, elementValue(child));
+  if (text) obj['_'] = text;
+  return obj;
+}
+
+export function parseXmlToJson(xml: string): Record<string, any> {
+  const root = parseXmlTree(xml);
+  const out: Record<string, any> = {};
+  for (const child of root.children) addChild(out, child.tag, elementValue(child));
+  return out;
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function buildXml(name: string, val: any): string {
+  if (Array.isArray(val)) return val.map((v) => buildXml(name, v)).join('');
+  if (val === null || val === undefined) return `<${name}/>`;
+  if (typeof val !== 'object') return `<${name}>${escapeXml(String(val))}</${name}>`;
+  const attrs = val['$'] && typeof val['$'] === 'object'
+    ? Object.entries(val['$'] as Record<string, unknown>).map(([k, v]) => ` ${k}="${escapeXml(String(v))}"`).join('')
+    : '';
+  let inner = '';
+  if ('_' in val) inner += escapeXml(String(val['_']));
+  for (const [k, v] of Object.entries(val)) { if (k === '$' || k === '_') continue; inner += buildXml(k, v); }
+  return `<${name}${attrs}>${inner}</${name}>`;
+}
+
+export function jsonToXml(obj: any): string {
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    return Object.entries(obj).map(([k, v]) => buildXml(k, v)).join('');
+  }
+  return buildXml('root', obj);
+}
+
+/**
+ * XML step (B56). For each item, convert its source field XML<->JSON and write
+ * the result into the configured output field. Other fields are preserved (it
+ * edits a copy of the item's json). Pure and deterministic.
+ */
+export async function convertXml(args: XmlConvertInput): Promise<Items> {
+  return args.input.map((item): Item => {
+    const json: Record<string, unknown> = { ...item.json };
+    const raw = getPath(item, args.sourceField);
+    if (args.direction === 'jsonToXml') {
+      json[args.outputName] = jsonToXml(raw === undefined ? item.json : raw);
+    } else {
+      const xml = typeof raw === 'string' ? raw : raw == null ? '' : String(raw);
+      json[args.outputName] = parseXmlToJson(xml);
+    }
+    return makeItem(json, { ...item.binary });
+  });
+}
