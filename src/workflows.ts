@@ -249,6 +249,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       const leaf = groupBy.split('.').pop() ?? 'group';
       return { main: order.map((key) => { const g = groups.get(key)!; return { json: { [leaf]: g.label as any, [outName]: agg(g.items) }, binary: {} }; }) };
     }
+    case 'scheduleTrigger':
+      // Entry-point trigger: emits one item carrying the fire time, starting the
+      // downstream flow. (Firing is driven by the scheduler in the API.)
+      return { main: [{ json: { source: 'schedule', firedAt: new Date().toISOString() }, binary: {} }] };
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

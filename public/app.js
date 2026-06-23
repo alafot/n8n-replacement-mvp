@@ -4,6 +4,7 @@
 //   POST/PUT/GET /definitions  - save/load durable definitions (B15, reusing B10)
 
 const STEP_TYPES = [
+  { type: 'scheduleTrigger', label: 'Schedule trigger', hint: 'Schedule', category: 'Trigger', icon: '⏰', desc: 'Entry point: starts the automation on a configured schedule (interval).' },
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
@@ -27,7 +28,7 @@ const STEP_TYPES = [
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
 ];
 const LABELS = Object.fromEntries(STEP_TYPES.map((s) => [s.type, s.label]));
-const CATEGORY_ORDER = ['Actions', 'Transform', 'Flow', 'Code'];
+const CATEGORY_ORDER = ['Trigger', 'Actions', 'Transform', 'Flow', 'Code'];
 
 const state = {
   nodes: [], // { id, type, label, x, y, params }
@@ -65,6 +66,7 @@ function defaultParams(type) {
   if (type === 'dateTime') return { operation: 'add', dateField: 'json.date', amount: 1, unit: 'days', format: 'YYYY-MM-DD', outputName: 'result' };
   if (type === 'summarize') return { func: 'sum', field: 'json.amount', groupBy: '', outputName: 'total' };
   if (type === 'compareDatasets') return { keyField: 'json.id' };
+  if (type === 'scheduleTrigger') return { intervalSeconds: 1 };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -614,6 +616,24 @@ function renderConfig() {
     c.appendChild(note);
     n.params.keyField = n.params.keyField ?? 'json.id';
     c.appendChild(field('Match key field (path)', 'cfg-compare-key', input(n.params.keyField, (v) => (n.params.keyField = v))));
+  } else if (n.type === 'scheduleTrigger') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Entry point. Save the automation, then Start the schedule to fire runs on the interval.';
+    c.appendChild(note);
+    n.params.intervalSeconds = n.params.intervalSeconds ?? 1;
+    const inp = input(String(n.params.intervalSeconds), (v) => { n.params.intervalSeconds = Math.max(0.2, Number(v) || 1); });
+    inp.type = 'number'; inp.step = '0.1'; inp.min = '0.2';
+    c.appendChild(field('Interval (seconds)', 'cfg-schedule-interval', inp));
+    const startBtn = document.createElement('button'); startBtn.textContent = 'Start schedule'; startBtn.dataset.testid = 'schedule-start'; startBtn.style.marginRight = '6px';
+    startBtn.addEventListener('click', async () => {
+      if (!state.defId) { $('#run-status').textContent = 'save the automation first'; return; }
+      const r = await fetch('/definitions/' + state.defId + '/schedule/start', { method: 'POST' }).then((x) => x.json());
+      $('#run-status').textContent = r.started ? 'schedule started (every ' + r.intervalMs + 'ms)' : 'schedule error: ' + (r.error || '');
+      $('#run-status').dataset.scheduleMs = r.intervalMs || '';
+    });
+    const stopBtn = document.createElement('button'); stopBtn.textContent = 'Stop schedule'; stopBtn.dataset.testid = 'schedule-stop';
+    stopBtn.addEventListener('click', async () => { if (!state.defId) return; await fetch('/definitions/' + state.defId + '/schedule/stop', { method: 'POST' }); $('#run-status').textContent = 'schedule stopped'; });
+    const wrap = document.createElement('div'); wrap.style.marginTop = '8px'; wrap.append(startBtn, stopBtn);
+    c.appendChild(wrap);
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

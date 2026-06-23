@@ -27,7 +27,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 14 | Rename Keys | ✅ satisfied | {first,qty,city} → Rename ⇒ {name,quantity,city} | `rename-keys/rename-keys-success.png` |
 | 15 | Date & Time | ✅ satisfied | seed{date:2026-01-01} → add 1 day ⇒ 2026-01-02 | `date-and-time/date-and-time-success.png` |
 | 16 | Summarize | ✅ satisfied | seed[A:10,B:5,A:7] → sum group by cat ⇒ A=17,B=5 | `summarize/summarize-success.png` |
-| 17 | Compare Datasets | _pending_ | — | — |
+| 17 | Compare Datasets | ✅ satisfied | A[1,2,3] vs B[2,3,4] ⇒ matched[2,3]/onlyA[1]/onlyB[4] | `compare-datasets/compare-datasets-success.png` |
 | 18 | Schedule (trigger) | _pending_ | — | — |
 | 19 | Webhook (trigger) | _pending_ | — | — |
 | 20 | Respond to Webhook | _pending_ | — | — |
@@ -133,3 +133,14 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified (known input → expected): grouped sum produced `[{cat:A,total:17},{cat:B,total:5}]` (10+7=17, 5). (Examiner also confirmed ungrouped sum=22 and grouped count A=2,B=1.)
 - Screenshot: `summarize/summarize-success.png`. Demo: `summarize/demo.mjs`.
 - Assumptions: demoed grouped sum; the node also offers count/avg/min/max and ungrouped totals.
+
+### Node 17 — Compare Datasets ✅ (completes the DATA group)
+- Sample: dataset A (`ids [1,2,3]`) and dataset B (`ids [2,3,4]`) → **Compare Datasets** (two inputs A/B, key `json.id`, three outputs) → three sinks. Ran on the real engine; run **completed**.
+- Verified (known input → expected): matched = `[2,3]`, only-in-A = `[1]`, only-in-B = `[4]`, each on its own output consumed by a separate downstream. (Examiner also confirmed swapping which dataset feeds A/B swaps only-in-A/only-in-B — a genuine two-input comparison.)
+- Screenshot: `compare-datasets/compare-datasets-success.png` (the matched sink showing ids 2,3 selected). Demo: `compare-datasets/demo.mjs`.
+- Assumptions: matched on `id`; demoed the three-output categorisation.
+
+---
+**DATA group complete** (nodes 9–17: Aggregate, Split Out, Sort, Limit, Remove Duplicates, Rename Keys, Date & Time, Summarize, Compare Datasets). Only the TRIGGER group (18–22) remains.
+
+> **⚠️ Decision flagged for your review (triggers):** The original roadmap (seq 244) deferred the *trigger execution model* — "reuse the existing run model vs. design-first" — until the trigger phase. Since you're asleep and authorised finishing all node types, I'm proceeding by specifying each trigger's **capability and configuration** and leaving the *execution mechanism* (whether a trigger fires fully live — a real timer/HTTP listener — vs. is a configured trigger node you start, as fits a spike) to the implementer, requiring the trigger-specific behaviour to be real and demonstrable. Please confirm/redirect this in the morning if you wanted a specific trigger model.

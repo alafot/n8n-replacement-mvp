@@ -246,6 +246,41 @@ async function main(): Promise<void> {
     }
   });
 
+  // Start a real durable run of a graph and record it in history.
+  const startGraphRun = async (graph: GraphDef, name: string, definitionId: string | null) => {
+    const runId = `run-${randomId()}`;
+    await client.workflow.start(runGraph, { taskQueue: TASK_QUEUE, workflowId: runId, args: [resolveSubworkflows(graph)] });
+    recordRunStart({ runId, automationName: name, automationId: definitionId, startedAt: new Date().toISOString(), graph });
+    return runId;
+  };
+
+  // --- B49: Schedule trigger — fire real runs on the configured interval. ---
+  const schedules = new Map<string, { handle: ReturnType<typeof setInterval>; ms: number }>();
+  app.post<{ Params: { id: string } }>('/definitions/:id/schedule/start', async (request, reply) => {
+    const def = getDefinition(request.params.id);
+    if (!def) return reply.code(404).send({ error: `no such definition: ${request.params.id}` });
+    const trig = (def.graph.nodes as any[]).find((n) => n.type === 'scheduleTrigger');
+    if (!trig) return reply.code(409).send({ error: 'automation has no schedule trigger' });
+    const ms = Math.max(200, (Number(trig.params?.intervalSeconds) || 1) * 1000);
+    const existing = schedules.get(request.params.id);
+    if (existing) clearInterval(existing.handle);
+    let fires = 0;
+    const fire = () => {
+      if (fires >= 60) { const s = schedules.get(request.params.id); if (s) clearInterval(s.handle); schedules.delete(request.params.id); return; }
+      fires++;
+      startGraphRun(def.graph as GraphDef, def.name, def.id).catch(() => {});
+    };
+    fire(); // fire immediately, then on the interval
+    const handle = setInterval(fire, ms);
+    schedules.set(request.params.id, { handle, ms });
+    return reply.send({ started: true, intervalMs: ms });
+  });
+  app.post<{ Params: { id: string } }>('/definitions/:id/schedule/stop', async (request, reply) => {
+    const s = schedules.get(request.params.id);
+    if (s) { clearInterval(s.handle); schedules.delete(request.params.id); }
+    return reply.send({ stopped: true });
+  });
+
   // --- B22: export an automation to n8n-compatible workflow JSON. ---
   app.post('/export/n8n', async (request, reply) => {
     const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDef };
