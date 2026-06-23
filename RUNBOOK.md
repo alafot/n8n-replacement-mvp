@@ -121,7 +121,10 @@ its named attributes, writing the result into a chosen output field (other
 fields are preserved). The XML step converts the source field between XML and
 JSON (XML→JSON parses an XML string into a structured JSON object — attributes
 under `$`, element text as the value — writing it to a chosen output field;
-JSON→XML serialises the inverse). The Switch
+JSON→XML serialises the inverse). The Markdown step converts the source field
+between Markdown and HTML (Markdown→HTML renders headings, bold/italic, inline
+code, links, lists and blockquotes into HTML written to a chosen output field;
+HTML→Markdown serialises the inverse). The Switch
 step does multi-way per-item routing: configure a set of rules (each routes
 matching items to its own output), with an optional fallback output for items
 matching no rule. The Filter step keeps only the items matching a condition on a

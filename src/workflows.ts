@@ -48,7 +48,7 @@ function deepestCause(err: any): string {
 /** Per-step status/output of a run, keyed by node id (B17). Queryable live. */
 export const getStepsQuery = defineQuery<Record<string, StepState>>('getSteps');
 
-const { httpRequest, runCode, runTransform, extractHtml, convertXml } = proxyActivities<typeof activities>({
+const { httpRequest, runCode, runTransform, extractHtml, convertXml, convertMarkdown } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: {
     // Fail reasonably fast on a genuine error (e.g. unreachable host) so a
@@ -130,6 +130,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
     case 'xml': {
       const p = node.params as any;
       return { main: await convertXml({ sourceField: String(p.sourceField ?? 'json.body'), direction: p.direction === 'jsonToXml' ? 'jsonToXml' : 'xmlToJson', outputName: String(p.outputName ?? 'data'), input }) };
+    }
+    case 'markdown': {
+      const p = node.params as any;
+      return { main: await convertMarkdown({ sourceField: String(p.sourceField ?? 'json.body'), direction: p.direction === 'htmlToMarkdown' ? 'htmlToMarkdown' : 'markdownToHtml', outputName: String(p.outputName ?? 'html'), input }) };
     }
     case 'if': {
       const decision = evaluateCondition(node.params.condition as Condition, input[0]);

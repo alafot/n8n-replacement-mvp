@@ -518,6 +518,124 @@ export function jsonToXml(obj: any): string {
   return buildXml('root', obj);
 }
 
+// ---- Markdown step (B57) -----------------------------------------------------
+// Convert Markdown <-> HTML. Markdown->HTML genuinely converts headings,
+// emphasis (bold/italic), inline code, links, lists, blockquotes and
+// paragraphs; HTML->Markdown serialises the common inverse.
+
+export interface MarkdownConvertInput {
+  /** Dot-path to the source string on each item (e.g. 'json.body'). */
+  sourceField: string;
+  /** 'markdownToHtml' = render Markdown into HTML; 'htmlToMarkdown' = inverse. */
+  direction: 'markdownToHtml' | 'htmlToMarkdown';
+  /** Field name to write the conversion result into on each item's json. */
+  outputName: string;
+  /** The items received from upstream. */
+  input: Items;
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Inline Markdown -> HTML (code spans, bold, italic, links) over already-escaped text.
+function inlineMd(text: string): string {
+  let s = escHtml(text);
+  s = s.replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/(^|[^\w])_([^_]+)_(?=[^\w]|$)/g, '$1<em>$2</em>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, t, u) => `<a href="${u}">${t}</a>`);
+  return s;
+}
+
+function markdownToHtml(md: string): string {
+  const lines = md.replace(/\r\n?/g, '\n').split('\n');
+  const out: string[] = [];
+  let i = 0;
+  let para: string[] = [];
+  const flushPara = () => { if (para.length) { out.push('<p>' + inlineMd(para.join(' ')) + '</p>'); para = []; } };
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (trimmed === '') { flushPara(); i++; continue; }
+    if (/^```/.test(trimmed)) {
+      flushPara();
+      const body: string[] = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { body.push(lines[i]); i++; }
+      i++;
+      out.push('<pre><code>' + escHtml(body.join('\n')) + '</code></pre>');
+      continue;
+    }
+    const h = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flushPara(); const lvl = h[1].length; out.push(`<h${lvl}>` + inlineMd(h[2].trim()) + `</h${lvl}>`); i++; continue; }
+    if (/^>\s?/.test(trimmed)) {
+      flushPara();
+      const body: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i].trim())) { body.push(lines[i].trim().replace(/^>\s?/, '')); i++; }
+      out.push('<blockquote>' + inlineMd(body.join(' ')) + '</blockquote>');
+      continue;
+    }
+    if (/^[-*+]\s+/.test(trimmed)) {
+      flushPara();
+      const items: string[] = [];
+      while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim())) { items.push(lines[i].trim().replace(/^[-*+]\s+/, '')); i++; }
+      out.push('<ul>' + items.map((t) => '<li>' + inlineMd(t) + '</li>').join('') + '</ul>');
+      continue;
+    }
+    if (/^\d+\.\s+/.test(trimmed)) {
+      flushPara();
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) { items.push(lines[i].trim().replace(/^\d+\.\s+/, '')); i++; }
+      out.push('<ol>' + items.map((t) => '<li>' + inlineMd(t) + '</li>').join('') + '</ol>');
+      continue;
+    }
+    para.push(trimmed);
+    i++;
+  }
+  flushPara();
+  return out.join('\n');
+}
+
+// HTML -> Markdown over the parsed HTML tree (B55's parser), common subset.
+function htmlNodeToMd(node: DomNode): string {
+  if (node.type === 'text') return decodeEntities(node.text).replace(/\s+/g, ' ');
+  const inner = node.children.map(htmlNodeToMd).join('');
+  switch (node.tag) {
+    case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+      return '\n\n' + '#'.repeat(Number(node.tag[1])) + ' ' + inner.trim() + '\n\n';
+    case 'strong': case 'b': return '**' + inner + '**';
+    case 'em': case 'i': return '*' + inner + '*';
+    case 'code': return '`' + inner + '`';
+    case 'a': return '[' + inner + '](' + (node.attribs['href'] ?? '') + ')';
+    case 'br': return '\n';
+    case 'p': return '\n\n' + inner.trim() + '\n\n';
+    case 'li': return '- ' + inner.trim() + '\n';
+    case 'ul': case 'ol': return '\n' + inner + '\n';
+    default: return inner;
+  }
+}
+
+function htmlToMarkdown(html: string): string {
+  const root = parseHtml(html);
+  return root.children.map(htmlNodeToMd).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Markdown step (B57). For each item, convert its source field Markdown<->HTML
+ * and write the result into the configured output field. Other fields are
+ * preserved (it edits a copy of the item's json). Pure and deterministic.
+ */
+export async function convertMarkdown(args: MarkdownConvertInput): Promise<Items> {
+  return args.input.map((item): Item => {
+    const json: Record<string, unknown> = { ...item.json };
+    const raw = getPath(item, args.sourceField);
+    const text = typeof raw === 'string' ? raw : raw == null ? '' : String(raw);
+    json[args.outputName] = args.direction === 'htmlToMarkdown' ? htmlToMarkdown(text) : markdownToHtml(text);
+    return makeItem(json, { ...item.binary });
+  });
+}
+
 /**
  * XML step (B56). For each item, convert its source field XML<->JSON and write
  * the result into the configured output field. Other fields are preserved (it

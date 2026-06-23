@@ -201,7 +201,7 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 | # | Node | Status | Sample workflow | Screenshot |
 |---|------|--------|-----------------|------------|
 | D1 | HTML Extract | ✅ satisfied | seed(html) → Extract (h1→title, a@href→link) ⇒ Hello / /x | `html-extract/html-extract-success.png` |
-| D2 | XML | _pending_ | — | — |
+| D2 | XML | ✅ satisfied | seed(xml) → XML→JSON ⇒ {order:{$:{id:7},item:book}} | `xml/xml-success.png` |
 | D3 | Markdown | _pending_ | — | — |
 | D4 | Crypto | _pending_ | — | — |
 | D5 | GraphQL | _pending_ | — | — |
@@ -211,6 +211,11 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 - Sample: seed (item holding `<h1>Hello</h1><a href="/x">link</a>`) → **HTML Extract** (rule `h1`→text→`title`, rule `a`→attribute `href`→`link`) → sink. Run **completed**.
 - Verified (known input → expected): `title="Hello"`, `link="/x"`, source field preserved. Builder confirmed commit + push to the remote (full branch pushed, remote main at this commit).
 - Screenshot: `html-extract/html-extract-success.png`. Demo: `html-extract/demo.mjs`.
+
+### Phase D · D2 — XML ✅
+- Sample: seed (`{xml:'<order id="7"><item>book</item></order>'}`) → **XML** (XML→JSON, → `parsed`) → sink. Run **completed**.
+- Verified (known input → expected): parsed to navigable JSON `{order:{$:{id:"7"},item:"book"}}` — id `7` and item text `book` both present; source preserved. Committed + pushed to the remote.
+- Screenshot: `xml/xml-success.png`. Demo: `xml/demo.mjs`.
 
 ## Post-review fixes
 

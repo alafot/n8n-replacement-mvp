@@ -12,6 +12,7 @@ const STEP_TYPES = [
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
   { type: 'htmlExtract', label: 'Extract from HTML', hint: 'HTML Extract', category: 'Transform', icon: '🔖', desc: 'Pull values out of HTML by CSS selector (element text or a named attribute) into named fields.' },
   { type: 'xml', label: 'XML ⇄ JSON', hint: 'XML', category: 'Transform', icon: '📄', desc: 'Convert XML to JSON (parse an XML string into structured JSON) or JSON back to XML.' },
+  { type: 'markdown', label: 'Markdown ⇄ HTML', hint: 'Markdown', category: 'Transform', icon: '📝', desc: 'Convert Markdown text to HTML (headings, bold/italic, code, links, lists) or HTML back to Markdown.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
   { type: 'splitOut', label: 'Split out', hint: 'Split Out', category: 'Transform', icon: '✂️', desc: 'Expand an item\'s list field into multiple items, one per element.' },
   { type: 'sort', label: 'Sort', hint: 'Sort', category: 'Transform', icon: '↕️', desc: 'Reorder items by a chosen field, ascending or descending.' },
@@ -61,6 +62,7 @@ function defaultParams(type) {
   if (type === 'transform') return { set: {}, copy: {}, rename: {}, remove: [] };
   if (type === 'htmlExtract') return { htmlField: 'json.body', rules: [{ selector: 'h1', returnType: 'text', attribute: '', output: 'title' }] };
   if (type === 'xml') return { sourceField: 'json.body', direction: 'xmlToJson', outputName: 'data' };
+  if (type === 'markdown') return { sourceField: 'json.body', direction: 'markdownToHtml', outputName: 'html' };
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
@@ -733,6 +735,18 @@ function renderConfig() {
     sel.addEventListener('change', () => { n.params.direction = sel.value; });
     c.appendChild(field('Conversion', 'cfg-xml-direction', sel));
     c.appendChild(field('Output field name', 'cfg-xml-output', input(n.params.outputName, (v) => (n.params.outputName = v))));
+  } else if (n.type === 'markdown') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Convert the source field between Markdown and HTML; the result is written to the output field (other fields preserved).';
+    c.appendChild(note);
+    n.params.sourceField = n.params.sourceField ?? 'json.body';
+    n.params.direction = n.params.direction ?? 'markdownToHtml';
+    n.params.outputName = n.params.outputName ?? 'html';
+    c.appendChild(field('Source field (path)', 'cfg-md-source', input(n.params.sourceField, (v) => (n.params.sourceField = v))));
+    const sel = document.createElement('select');
+    for (const d of ['markdownToHtml', 'htmlToMarkdown']) { const o = document.createElement('option'); o.value = d; o.textContent = d === 'markdownToHtml' ? 'Markdown → HTML' : 'HTML → Markdown'; if (n.params.direction === d) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.direction = sel.value; });
+    c.appendChild(field('Conversion', 'cfg-md-direction', sel));
+    c.appendChild(field('Output field name', 'cfg-md-output', input(n.params.outputName, (v) => (n.params.outputName = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }
