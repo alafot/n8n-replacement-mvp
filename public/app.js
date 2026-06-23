@@ -14,6 +14,7 @@ const STEP_TYPES = [
   { type: 'renameKeys', label: 'Rename keys', hint: 'Rename Keys', category: 'Transform', icon: '🏷️', desc: 'Rename fields (old name → new name), preserving values and other fields.' },
   { type: 'dateTime', label: 'Date & time', hint: 'Date & Time', category: 'Transform', icon: '📅', desc: 'Format a date or add/subtract a span, writing the result onto the item.' },
   { type: 'summarize', label: 'Summarize', hint: 'Summarize', category: 'Transform', icon: '🧮', desc: 'Compute summary statistics (sum/count/avg/min/max), optionally grouped by a field.' },
+  { type: 'compareDatasets', label: 'Compare datasets', hint: 'Compare Datasets', category: 'Transform', icon: '⚖️', desc: 'Compare two inputs by a key into matched / only-in-A / only-in-B.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -63,6 +64,7 @@ function defaultParams(type) {
   if (type === 'renameKeys') return { renames: { first: 'name' } };
   if (type === 'dateTime') return { operation: 'add', dateField: 'json.date', amount: 1, unit: 'days', format: 'YYYY-MM-DD', outputName: 'result' };
   if (type === 'summarize') return { func: 'sum', field: 'json.amount', groupBy: '', outputName: 'total' };
+  if (type === 'compareDatasets') return { keyField: 'json.id' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -72,9 +74,16 @@ function defaultParams(type) {
 }
 
 // Output ports a node exposes (drives rendering + connection 'port' values).
+// Input ports a node exposes (left side). Most nodes have a single implicit
+// input; multi-input nodes (Compare Datasets) expose named inputs.
+function inputsOf(node) {
+  if (node.type === 'compareDatasets') return ['a', 'b'];
+  return [];
+}
 function portsOf(node) {
   if (node.type === 'if') return ['true', 'false'];
   if (node.type === 'loop') return ['loop', 'done'];
+  if (node.type === 'compareDatasets') return ['matched', 'onlyA', 'onlyB'];
   if (node.type === 'switch') {
     const rules = (node.params && Array.isArray(node.params.rules)) ? node.params.rules : [];
     const ports = rules.map((_, i) => String(i));
@@ -89,8 +98,16 @@ function portLabel(port) {
   if (port === 'fallback') return '*';
   if (port === 'loop') return '↻';
   if (port === 'done') return '✓';
+  if (port === 'matched') return 'M';
+  if (port === 'onlyA' || port === 'a') return 'A';
+  if (port === 'onlyB' || port === 'b') return 'B';
   if (port === 'main') return '→';
   return String(Number(port) + 1); // rule outputs shown 1-based
+}
+function inputPortPoint(node, port) {
+  const ins = inputsOf(node);
+  const idx = Math.max(0, ins.indexOf(port));
+  return { x: node.x, y: node.y + 16 + idx * 18 };
 }
 
 function addNode(type, pos) {
@@ -123,13 +140,23 @@ function portPoint(node, port) {
 function nodeInPoint(node) {
   return { x: node.x, y: node.y + 22 };
 }
+// Target endpoint of a connection: a specific input handle if the edge feeds a
+// named input (e.g. Compare Datasets A/B), else the node's left-centre.
+function connTargetPoint(conn) {
+  const to = nodeById(conn.to);
+  if (!to) return { x: 0, y: 0 };
+  if (conn.toPort && inputsOf(to).includes(conn.toPort)) return inputPortPoint(to, conn.toPort);
+  return nodeInPoint(to);
+}
 function armConnection(from, port) {
   state.arm = { from, port };
   render();
 }
-function connect(fromId, port, toId) {
+function connect(fromId, port, toId, toPort) {
   if (!fromId || !toId || fromId === toId) return;
-  state.connections.push({ id: 'c' + (state.counter += 1), from: fromId, to: toId, port });
+  const conn = { id: 'c' + (state.counter += 1), from: fromId, to: toId, port };
+  if (toPort) conn.toPort = toPort;
+  state.connections.push(conn);
   render();
 }
 function completeConnection(toId) {
@@ -150,7 +177,7 @@ function updateLinks() {
   for (const c of state.connections) {
     const from = nodeById(c.from), to = nodeById(c.to);
     if (!from || !to) continue;
-    const a = portPoint(from, c.port), b = nodeInPoint(to);
+    const a = portPoint(from, c.port), b = connTargetPoint(c);
     const line = svg.querySelector(`line[data-conn-id="${c.id}"]`);
     if (line) { line.setAttribute('x1', a.x); line.setAttribute('y1', a.y); line.setAttribute('x2', b.x); line.setAttribute('y2', b.y); }
     const del = canvas.querySelector(`.conn-del[data-conn-id="${c.id}"]`);
@@ -199,10 +226,15 @@ document.addEventListener('mouseup', (ev) => {
   if (d.mode === 'connect') {
     const temp = svg.querySelector('#temp-line');
     if (temp) temp.remove();
-    // Forgiving target: drop anywhere on the target node's body.
-    const overNode = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.node');
-    if (d.moved && overNode) {
-      connect(d.from, d.port, overNode.dataset.nodeId); // drag-connect
+    // Forgiving target: drop on the target node's body, OR on a specific input
+    // handle (e.g. Compare Datasets A/B) to feed that named input.
+    const elAt = document.elementFromPoint(ev.clientX, ev.clientY);
+    const overInput = elAt?.closest('.input-port');
+    const overNode = elAt?.closest('.node');
+    if (d.moved && overInput) {
+      connect(d.from, d.port, overInput.dataset.nodeId, overInput.dataset.port); // drag to a named input
+    } else if (d.moved && overNode) {
+      connect(d.from, d.port, overNode.dataset.nodeId); // drag-connect (default input)
     } else if (!d.moved) {
       armConnection(d.from, d.port); // click (no drag) falls back to arm-then-click
     }
@@ -245,7 +277,7 @@ function cancelDeleteStep() {
 function toGraph() {
   return {
     nodes: state.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label, position: { x: n.x, y: n.y }, params: n.params })),
-    connections: state.connections.map((c) => ({ id: c.id, from: c.from, to: c.to, port: c.port })),
+    connections: state.connections.map((c) => ({ id: c.id, from: c.from, to: c.to, port: c.port, ...(c.toPort ? { toPort: c.toPort } : {}) })),
   };
 }
 function loadGraph(graph) {
@@ -253,7 +285,7 @@ function loadGraph(graph) {
     id: n.id, type: n.type, label: n.label || LABELS[n.type] || n.type,
     x: n.position ? n.position.x : 60, y: n.position ? n.position.y : 60, params: n.params || defaultParams(n.type),
   }));
-  state.connections = (graph.connections || []).map((c, i) => ({ id: c.id || 'c' + i, from: c.from, to: c.to, port: c.port || 'main' }));
+  state.connections = (graph.connections || []).map((c, i) => ({ id: c.id || 'c' + i, from: c.from, to: c.to, port: c.port || 'main', ...(c.toPort ? { toPort: c.toPort } : {}) }));
   state.counter = state.nodes.length + state.connections.length + 100;
   state.selectedId = null;
   state.lastSteps = {};
@@ -294,6 +326,23 @@ function render() {
       ports.appendChild(pe);
     }
     el.appendChild(ports);
+    // input ports (left side) for multi-input nodes (drop a connection here).
+    const ins = inputsOf(n);
+    if (ins.length) {
+      const inWrap = document.createElement('div');
+      inWrap.className = 'in-ports';
+      for (const ip of ins) {
+        const ie = document.createElement('div');
+        ie.className = 'input-port';
+        ie.dataset.testid = 'input-port';
+        ie.dataset.nodeId = n.id;
+        ie.dataset.port = ip;
+        ie.title = 'input ' + ip;
+        ie.textContent = portLabel(ip);
+        inWrap.appendChild(ie);
+      }
+      el.appendChild(inWrap);
+    }
     // Delete affordance on the node (asks for confirmation first — B29).
     const delBtn = document.createElement('button');
     delBtn.className = 'node-delete';
@@ -307,7 +356,7 @@ function render() {
     el.appendChild(delBtn);
     // Drag the node body to MOVE it (B28); a click (no drag) selects/completes.
     el.addEventListener('mousedown', (ev) => {
-      if (ev.target.closest('.port') || ev.target.closest('.conn-del') || ev.target.closest('.node-delete')) return;
+      if (ev.target.closest('.port') || ev.target.closest('.input-port') || ev.target.closest('.conn-del') || ev.target.closest('.node-delete')) return;
       ev.preventDefault();
       startNodeDrag(n.id, ev);
     });
@@ -318,7 +367,7 @@ function render() {
   for (const c of state.connections) {
     const from = nodeById(c.from), to = nodeById(c.to);
     if (!from || !to) continue;
-    const a = portPoint(from, c.port), b = nodeInPoint(to);
+    const a = portPoint(from, c.port), b = connTargetPoint(c);
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
     line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
@@ -329,7 +378,7 @@ function render() {
     del.className = 'conn-del';
     del.dataset.testid = 'conn-delete';
     del.dataset.connId = c.id;
-    del.dataset.from = c.from; del.dataset.to = c.to; del.dataset.port = c.port;
+    del.dataset.from = c.from; del.dataset.to = c.to; del.dataset.port = c.port; if (c.toPort) del.dataset.toPort = c.toPort;
     del.style.left = (a.x + b.x) / 2 + 'px';
     del.style.top = (a.y + b.y) / 2 + 'px';
     del.textContent = '×';
@@ -560,6 +609,11 @@ function renderConfig() {
     c.appendChild(field('Field (path, numeric)', 'cfg-sum-field', input(n.params.field ?? 'json.amount', (v) => (n.params.field = v))));
     c.appendChild(field('Group by (path, optional)', 'cfg-sum-groupby', input(n.params.groupBy ?? '', (v) => (n.params.groupBy = v))));
     c.appendChild(field('Output field name', 'cfg-sum-output', input(n.params.outputName ?? 'total', (v) => (n.params.outputName = v))));
+  } else if (n.type === 'compareDatasets') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Wire two inputs (A and B), then matched / only-in-A / only-in-B on the three outputs.';
+    c.appendChild(note);
+    n.params.keyField = n.params.keyField ?? 'json.id';
+    c.appendChild(field('Match key field (path)', 'cfg-compare-key', input(n.params.keyField, (v) => (n.params.keyField = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

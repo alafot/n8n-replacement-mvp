@@ -26,7 +26,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 13 | Remove Duplicates | ✅ satisfied | seed ids[1,2,2,3,1] → Remove Dups ⇒ [1,2,3] | `remove-duplicates/remove-duplicates-success.png` |
 | 14 | Rename Keys | ✅ satisfied | {first,qty,city} → Rename ⇒ {name,quantity,city} | `rename-keys/rename-keys-success.png` |
 | 15 | Date & Time | ✅ satisfied | seed{date:2026-01-01} → add 1 day ⇒ 2026-01-02 | `date-and-time/date-and-time-success.png` |
-| 16 | Summarize | _pending_ | — | — |
+| 16 | Summarize | ✅ satisfied | seed[A:10,B:5,A:7] → sum group by cat ⇒ A=17,B=5 | `summarize/summarize-success.png` |
 | 17 | Compare Datasets | _pending_ | — | — |
 | 18 | Schedule (trigger) | _pending_ | — | — |
 | 19 | Webhook (trigger) | _pending_ | — | — |
@@ -127,3 +127,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified (known input → expected output): `result` = `2026-01-02` (returned as ISO `2026-01-02T00:00:00.000Z`) — Jan 1 + 1 day correctly computed — with the original `date` and `label` preserved. (Examiner also confirmed the format operation: `2026-01-01` as DD/MM/YYYY → `01/01/2026`.)
 - Screenshot: `date-and-time/date-and-time-success.png`. Demo: `date-and-time/demo.mjs`.
 - Assumptions: demoed the add operation; the node also offers subtract and format. (Note: add/subtract return a full ISO timestamp; the format operation returns a plain formatted string.)
+
+### Node 16 — Summarize ✅
+- Sample: seed (`[{cat:A,amt:10},{cat:B,amt:5},{cat:A,amt:7}]`) → **Summarize** (function sum, field `json.amt`, group by `json.cat`, → `total`) → sink. Ran on the real engine; run **completed**.
+- Verified (known input → expected): grouped sum produced `[{cat:A,total:17},{cat:B,total:5}]` (10+7=17, 5). (Examiner also confirmed ungrouped sum=22 and grouped count A=2,B=1.)
+- Screenshot: `summarize/summarize-success.png`. Demo: `summarize/demo.mjs`.
+- Assumptions: demoed grouped sum; the node also offers count/avg/min/max and ungrouped totals.

@@ -332,10 +332,17 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
     if (!active.has(nodeId)) continue; // untaken branch — no execution, no output
     const node = def.nodes.find((n) => n.id === nodeId)!;
 
-    // Input = items from the TAKEN incoming edges' source ports only.
+    // Input = items from the TAKEN incoming edges' source ports. Also bucket by
+    // target INPUT port so multi-input nodes (Compare Datasets) can tell A from B.
     const input: Items = [];
+    const inByPort: Record<string, Items> = {};
     def.connections.forEach((c, i) => {
-      if (c.to === nodeId && takenEdges.has(i)) input.push(...(portOutputs[c.from]?.[c.port ?? 'main'] ?? []));
+      if (c.to === nodeId && takenEdges.has(i)) {
+        const items = portOutputs[c.from]?.[c.port ?? 'main'] ?? [];
+        input.push(...items);
+        const tp = c.toPort ?? 'main';
+        (inByPort[tp] ||= []).push(...items);
+      }
     });
 
     steps[nodeId] = { status: 'running', input }; // observable as 'running'; record the input it received
@@ -372,6 +379,19 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
         const subRoots = sub.nodes.filter((sn) => !sub.connections.some((c) => c.to === sn.id)).map((sn) => sn.id);
         const subOut = await runScopedSlice(sub, new Set(sub.nodes.map((sn) => sn.id)), subRoots, input, {});
         emit = { main: subOut };
+      } else if (node.type === 'compareDatasets') {
+        // Compare two inputs (A and B) by a key into matched / onlyA / onlyB.
+        const key = String((node.params as any).keyField ?? 'json.id');
+        const a = inByPort['a'] ?? [];
+        const b = inByPort['b'] ?? [];
+        const keyOf = (it: any) => JSON.stringify(getPath(it, key));
+        const aKeys = new Set(a.map(keyOf));
+        const bKeys = new Set(b.map(keyOf));
+        emit = {
+          matched: a.filter((it) => bKeys.has(keyOf(it))),
+          onlyA: a.filter((it) => !bKeys.has(keyOf(it))),
+          onlyB: b.filter((it) => !aKeys.has(keyOf(it))),
+        };
       } else {
         emit = await execOne(node, input);
       }
@@ -384,7 +404,7 @@ export async function runGraph(def: GraphDefinition): Promise<Items> {
 
     // Mark which outgoing edges are taken, activating their targets. For gated
     // nodes (if/switch/loop) an edge is taken only if its port actually has items.
-    const gated = node.type === 'if' || node.type === 'switch' || node.type === 'loop';
+    const gated = node.type === 'if' || node.type === 'switch' || node.type === 'loop' || node.type === 'compareDatasets';
     def.connections.forEach((c, i) => {
       if (c.from !== nodeId) return;
       const port = c.port ?? 'main';

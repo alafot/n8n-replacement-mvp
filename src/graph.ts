@@ -3,7 +3,7 @@
 // directed connections between them. Data flows from a node to the nodes it
 // connects to.
 
-export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait' | 'noop' | 'stopError' | 'executeSubworkflow' | 'aggregate' | 'splitOut' | 'sort' | 'limit' | 'removeDuplicates' | 'renameKeys' | 'dateTime' | 'summarize';
+export type NodeType = 'httpRequest' | 'code' | 'transform' | 'if' | 'switch' | 'filter' | 'merge' | 'loop' | 'wait' | 'noop' | 'stopError' | 'executeSubworkflow' | 'aggregate' | 'splitOut' | 'sort' | 'limit' | 'removeDuplicates' | 'renameKeys' | 'dateTime' | 'summarize' | 'compareDatasets';
 
 /** Node ids reachable forward from any of `starts` (following connections). */
 export function reachableFrom(def: GraphDefinition, starts: string[]): Set<string> {
@@ -37,6 +37,12 @@ export interface GraphConnection {
    * 'fallback' for a 'switch'. An edge is only "taken" when its port carries items.
    */
   port?: string;
+  /**
+   * Target INPUT port this edge feeds into. Used by multi-input nodes that
+   * distinguish their inputs (e.g. 'a' / 'b' on a Compare Datasets step).
+   * Omitted for ordinary single-input nodes.
+   */
+  toPort?: string;
 }
 
 /** A structured, pure boolean condition for the IF node (no code execution). */
