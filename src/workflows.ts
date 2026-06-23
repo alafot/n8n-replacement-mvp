@@ -265,6 +265,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       // Entry-point trigger: emits the submitted form values (injected at submit
       // time by the API form endpoint), starting the downstream flow.
       return { main: [{ json: { ...((node.params as any)._payload ?? {}) }, binary: {} }] };
+    case 'errorTrigger':
+      // Entry-point trigger for error-handling automations: emits the failure
+      // details (injected by the API when a linked target automation fails).
+      return { main: [{ json: { ...((node.params as any)._payload ?? {}) }, binary: {} }] };
     case 'respondToWebhook': {
       // Build the HTTP response (status + body) for the webhook caller. The body
       // can carry automation-derived data (the first incoming item) or a static value.

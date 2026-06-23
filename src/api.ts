@@ -228,6 +228,7 @@ async function main(): Promise<void> {
       args: [resolveSubworkflows(def.graph as GraphDef)],
     });
     recordRunStart({ runId, automationName: def.name, automationId: def.id, startedAt: new Date().toISOString(), graph: def.graph });
+    attachFailureWatch(runId, def.id);
 
     return reply.code(202).send({
       runId: handle.workflowId,
@@ -251,7 +252,33 @@ async function main(): Promise<void> {
     const runId = `run-${randomId()}`;
     await client.workflow.start(runGraph, { taskQueue: TASK_QUEUE, workflowId: runId, args: [resolveSubworkflows(graph)] });
     recordRunStart({ runId, automationName: name, automationId: definitionId, startedAt: new Date().toISOString(), graph });
+    attachFailureWatch(runId, definitionId);
     return runId;
+  };
+
+  // --- B53: Error Trigger — when a run of a target automation fails, auto-fire
+  // any error-handler automation whose Error Trigger is linked to that target. ---
+  const attachFailureWatch = (runId: string, automationId: string | null) => {
+    client.workflow
+      .getHandle(runId)
+      .result()
+      .then(
+        () => {},
+        async (err: any) => {
+          await refreshRun(runId).catch(() => {});
+          if (!automationId) return;
+          const message = describeFailure(err);
+          for (const { id } of listDefinitions()) {
+            const handler = getDefinition(id);
+            const et = handler && (handler.graph.nodes as any[]).find((n) => n.type === 'errorTrigger' && n.params?.targetDefinitionId === automationId);
+            if (!handler || !et) continue;
+            const graph = JSON.parse(JSON.stringify(handler.graph));
+            const e = (graph.nodes as any[]).find((n) => n.type === 'errorTrigger' && n.params?.targetDefinitionId === automationId);
+            e.params._payload = { failedAutomationId: automationId, failedRunId: runId, error: message };
+            await startGraphRun(graph as GraphDef, handler.name, handler.id).catch(() => {});
+          }
+        },
+      );
   };
 
   // --- B49: Schedule trigger — fire real runs on the configured interval. ---

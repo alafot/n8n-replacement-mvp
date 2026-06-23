@@ -7,6 +7,7 @@ const STEP_TYPES = [
   { type: 'scheduleTrigger', label: 'Schedule trigger', hint: 'Schedule', category: 'Trigger', icon: '⏰', desc: 'Entry point: starts the automation on a configured schedule (interval).' },
   { type: 'webhookTrigger', label: 'Webhook trigger', hint: 'Webhook', category: 'Trigger', icon: '🪝', desc: 'Entry point: starts the automation when an HTTP request hits its path, carrying the payload.' },
   { type: 'formTrigger', label: 'Form trigger', hint: 'Form', category: 'Trigger', icon: '📝', desc: 'Entry point: serves a web form; submitting it starts a run carrying the entered values.' },
+  { type: 'errorTrigger', label: 'Error trigger', hint: 'Error Trigger', category: 'Trigger', icon: '⚠️', desc: 'Entry point: runs this automation when a linked target automation fails, with the failure details.' },
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
@@ -73,6 +74,7 @@ function defaultParams(type) {
   if (type === 'webhookTrigger') return { path: 'hook' };
   if (type === 'respondToWebhook') return { status: 200, bodyMode: 'firstItem', staticBody: '{}' };
   if (type === 'formTrigger') return { path: 'form', fields: ['name'] };
+  if (type === 'errorTrigger') return { targetDefinitionId: '' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -674,6 +676,16 @@ function renderConfig() {
     c.appendChild(field('Fields (comma-separated)', 'cfg-form-fields', input(n.params.fields.join(','), (v) => { n.params.fields = v.split(',').map((s) => s.trim()).filter(Boolean); })));
     refreshUrl();
     c.appendChild(field('Form URL', 'form-url', urlEl));
+  } else if (n.type === 'errorTrigger') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Entry point. Runs this automation when the linked target automation fails, with the failure details.';
+    c.appendChild(note);
+    const sel = document.createElement('select');
+    const ph = document.createElement('option'); ph.value = ''; ph.textContent = '— target automation to watch —'; sel.appendChild(ph);
+    sel.addEventListener('change', () => { n.params.targetDefinitionId = sel.value; });
+    c.appendChild(field('Handles failures of', 'cfg-error-target', sel));
+    fetch('/definitions').then((r) => r.json()).then((list) => {
+      for (const d of list) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name + ' (' + d.id.slice(0, 12) + '…)'; if (n.params.targetDefinitionId === d.id) o.selected = true; sel.appendChild(o); }
+    }).catch(() => {});
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

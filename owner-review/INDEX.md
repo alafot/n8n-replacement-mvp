@@ -31,7 +31,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 18 | Schedule (trigger) | ✅ satisfied | Schedule(0.5s)→sink; started ⇒ 6 real runs in history | `schedule-trigger/schedule-trigger-success.png` |
 | 19 | Webhook (trigger) | ✅ satisfied | POST /webhook/review-hook ⇒ run fired, payload {order:123} downstream | `webhook-trigger/webhook-trigger-success.png` |
 | 20 | Respond to Webhook | ✅ satisfied | webhook→double→respond(201); POST{order:21} ⇒ caller gets 201 {doubled:42} | `respond-to-webhook/respond-to-webhook-success.png` |
-| 21 | Form (trigger) | _pending_ | — | — |
+| 21 | Form (trigger) | ✅ satisfied | served form /form/signup; submit {name:Ada,qty:3} ⇒ run carries them | `form-trigger/form-trigger-success.png` |
 | 22 | Error Trigger | _pending_ | — | — |
 
 ## Notes log
@@ -164,3 +164,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified by the actual HTTP response the caller received: **HTTP 201** (non-default status) with body `{received:21, doubled:42, status:ok}` — carrying an automation-derived value (21×2=42), a genuine request/response round-trip, not a static ack. Used downstream of the trigger.
 - Screenshot: `respond-to-webhook/respond-to-webhook-success.png`. Demo: `respond-to-webhook/demo.mjs`.
 - Assumptions: demoed status 201 + first-item body mode; the node also offers a static JSON body.
+
+### Node 21 — Form (trigger) ✅
+- Sample: **Form trigger** (path `signup`, fields `name,qty`) → sink. Saved, opened the served form at `/form/signup`, filled `name=Ada, qty=3`, submitted.
+- Verified: the form genuinely rendered the configured fields; submitting it fired a real durable run, and the downstream step received exactly `{name:'Ada', qty:'3'}`. Entry point (no incoming connection); form config persists across save/reload.
+- Screenshot: `form-trigger/form-trigger-success.png` (the served form, filled, showing "Submitted — run …"). Demo: `form-trigger/demo.mjs`.
+- Assumptions: simple text fields; qty arrives as a string ("3") as entered in the form.

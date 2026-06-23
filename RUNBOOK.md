@@ -149,7 +149,9 @@ Webhook step (used downstream of a Webhook trigger) sends a custom HTTP status +
 body back to the caller, so the webhook request returns the automation's result.
 The Form trigger is an entry-point step that serves a web form at `/form/<path>`;
 submitting it starts a run carrying the entered values (the automation must be
-saved).
+saved). The Error trigger is an entry-point step that links to a target
+automation and runs automatically (with the failure details) when a run of that
+target fails.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by
