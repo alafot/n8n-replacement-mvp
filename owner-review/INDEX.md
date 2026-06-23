@@ -203,7 +203,7 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 | D1 | HTML Extract | ✅ satisfied | seed(html) → Extract (h1→title, a@href→link) ⇒ Hello / /x | `html-extract/html-extract-success.png` |
 | D2 | XML | ✅ satisfied | seed(xml) → XML→JSON ⇒ {order:{$:{id:7},item:book}} | `xml/xml-success.png` |
 | D3 | Markdown | ✅ satisfied | seed(md) → MD→HTML ⇒ `<h1>Hello</h1>…<strong>bold</strong>` | `markdown/markdown-success.png` |
-| D4 | Crypto | _pending_ | — | — |
+| D4 | Crypto | ✅ satisfied | seed('hello') → SHA256 ⇒ 2cf24dba…b9824 (known vector) | `crypto/crypto-success.png` |
 | D5 | GraphQL | _pending_ | — | — |
 | D6 | RSS Read | _pending_ | — | — |
 
@@ -221,6 +221,11 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 - Sample: seed (`{md:'# Hello\n\nsome **bold** text'}`) → **Markdown** (MD→HTML, → `html`) → sink. Run **completed**.
 - Verified (known input → expected): `<h1>Hello</h1>\n<p>some <strong>bold</strong> text</p>` — heading and emphasis converted; source preserved. Committed + pushed.
 - Screenshot: `markdown/markdown-success.png`. Demo: `markdown/demo.mjs`.
+
+### Phase D · D4 — Crypto ✅
+- Sample: seed (`{value:'hello'}`) → **Crypto** (Hash, SHA256, → `hash`) → sink. Run **completed**.
+- Verified (known test vector): `SHA256('hello')` = `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` — exact match, deterministic; source preserved. Committed + pushed.
+- Screenshot: `crypto/crypto-success.png`. Demo: `crypto/demo.mjs`.
 
 ## Post-review fixes
 

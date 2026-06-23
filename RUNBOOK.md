@@ -126,7 +126,11 @@ between Markdown and HTML (Markdown→HTML renders headings, bold/italic, inline
 code, links, lists and blockquotes into HTML written to a chosen output field;
 HTML→Markdown serialises the inverse). The Crypto step performs a cryptographic
 operation on the source field — hashing (MD5/SHA1/SHA256/SHA512) or base64
-encode/decode — writing the result to a chosen output field. The Switch
+encode/decode — writing the result to a chosen output field. The GraphQL step
+sends a GraphQL query (with optional variables) to a configured endpoint via a
+real HTTP POST and places the response data onto the item; GraphQL errors or an
+unreachable endpoint surface as a clear run failure (a small offline test
+GraphQL endpoint is served at `POST /test/graphql`). The Switch
 step does multi-way per-item routing: configure a set of rules (each routes
 matching items to its own output), with an optional fallback output for items
 matching no rule. The Filter step keeps only the items matching a condition on a

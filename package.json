@@ -48,7 +48,8 @@
     "e2e:html-extract": "node e2e/html-extract.mjs",
     "e2e:xml": "node e2e/xml.mjs",
     "e2e:markdown": "node e2e/markdown.mjs",
-    "e2e:crypto": "node e2e/crypto.mjs"
+    "e2e:crypto": "node e2e/crypto.mjs",
+    "e2e:graphql": "node e2e/graphql.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",

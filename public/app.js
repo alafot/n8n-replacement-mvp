@@ -31,6 +31,7 @@ const STEP_TYPES = [
   { type: 'wait', label: 'Wait', hint: 'Pause', category: 'Flow', icon: '⏱️', desc: 'Pause the run for a configured time, then pass items through unchanged.' },
   { type: 'noop', label: 'No operation', hint: 'No-Op', category: 'Flow', icon: '➡️', desc: 'A no-op: passes items straight through unchanged.' },
   { type: 'stopError', label: 'Stop and error', hint: 'Stop And Error', category: 'Flow', icon: '🛑', desc: 'Deliberately fail the run with a custom error message, aborting downstream.' },
+  { type: 'graphql', label: 'GraphQL', hint: 'GraphQL', category: 'Actions', icon: '◈', desc: 'Send a GraphQL query (with variables) to an endpoint and put the response data on the item.' },
   { type: 'executeSubworkflow', label: 'Execute sub-workflow', hint: 'Execute Workflow', category: 'Actions', icon: '📦', desc: 'Run another saved automation as a step, feeding it these items and returning its results.' },
   { type: 'respondToWebhook', label: 'Respond to webhook', hint: 'Respond to Webhook', category: 'Actions', icon: '↩️', desc: 'Send a custom HTTP response (status + body) back to the webhook caller.' },
   { type: 'code', label: 'Run a code snippet', hint: 'Code / Function', category: 'Code', icon: '💻', desc: 'Run a JavaScript snippet over the items.' },
@@ -65,6 +66,7 @@ function defaultParams(type) {
   if (type === 'xml') return { sourceField: 'json.body', direction: 'xmlToJson', outputName: 'data' };
   if (type === 'markdown') return { sourceField: 'json.body', direction: 'markdownToHtml', outputName: 'html' };
   if (type === 'crypto') return { action: 'hash', algorithm: 'sha256', sourceField: 'json.value', outputName: 'hash' };
+  if (type === 'graphql') return { endpoint: '', query: '', variables: '{}', outputName: 'data' };
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
@@ -768,6 +770,17 @@ function renderConfig() {
     }
     c.appendChild(field('Source field (path)', 'cfg-crypto-source', input(n.params.sourceField, (v) => (n.params.sourceField = v))));
     c.appendChild(field('Output field name', 'cfg-crypto-output', input(n.params.outputName, (v) => (n.params.outputName = v))));
+  } else if (n.type === 'graphql') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Send a GraphQL query (with optional variables) to the endpoint; the response data is written to the output field.';
+    c.appendChild(note);
+    n.params.endpoint = n.params.endpoint ?? '';
+    n.params.query = n.params.query ?? '';
+    n.params.variables = n.params.variables ?? '{}';
+    n.params.outputName = n.params.outputName ?? 'data';
+    c.appendChild(field('Endpoint URL', 'cfg-graphql-endpoint', input(n.params.endpoint, (v) => (n.params.endpoint = v))));
+    c.appendChild(field('Query', 'cfg-graphql-query', textarea(n.params.query, (v) => (n.params.query = v))));
+    c.appendChild(field('Variables (JSON, optional)', 'cfg-graphql-variables', textarea(n.params.variables, (v) => (n.params.variables = v))));
+    c.appendChild(field('Output field name', 'cfg-graphql-output', input(n.params.outputName, (v) => (n.params.outputName = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

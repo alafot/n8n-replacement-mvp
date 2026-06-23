@@ -519,6 +519,46 @@ export function jsonToXml(obj: any): string {
   return buildXml('root', obj);
 }
 
+// ---- GraphQL step (B59) ------------------------------------------------------
+// Send a GraphQL query (with optional variables) to a configured endpoint via a
+// REAL HTTP POST and place the response data onto the item. GraphQL `errors` (or
+// a non-2xx / unreachable endpoint) surface as a genuine failure, not a fake
+// success.
+
+export interface GraphqlInput {
+  /** Absolute GraphQL endpoint URL. */
+  endpoint: string;
+  /** The GraphQL query string. */
+  query: string;
+  /** Optional GraphQL variables. */
+  variables?: Record<string, unknown>;
+  /** Field name to write the response `data` into on each item's json. */
+  outputName: string;
+  /** The items received from upstream. */
+  input: Items;
+}
+
+export async function graphqlQuery(args: GraphqlInput): Promise<Items> {
+  if (!args.endpoint || !/^https?:\/\//.test(args.endpoint)) {
+    throw new Error('GraphQL: a valid absolute endpoint URL is required');
+  }
+  const res = await fetch(args.endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ query: args.query, variables: args.variables ?? {} }),
+  });
+  const text = await res.text();
+  let payload: any;
+  try { payload = text ? JSON.parse(text) : {}; } catch { throw new Error(`GraphQL endpoint returned non-JSON (status ${res.status})`); }
+  if (payload && Array.isArray(payload.errors) && payload.errors.length) {
+    throw new Error('GraphQL error: ' + payload.errors.map((e: any) => e?.message ?? String(e)).join('; '));
+  }
+  if (!res.ok) throw new Error(`GraphQL request failed with status ${res.status}`);
+  const data = payload?.data ?? null;
+  const items = args.input.length ? args.input : [makeItem({}, {})];
+  return items.map((it): Item => makeItem({ ...it.json, [args.outputName]: data }, { ...it.binary }));
+}
+
 // ---- Crypto step (B58) -------------------------------------------------------
 // Perform a cryptographic operation on a field. Hashing (md5/sha1/sha256/sha512)
 // uses Node's crypto and is deterministic (same input -> same digest), plus

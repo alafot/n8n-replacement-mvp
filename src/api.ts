@@ -521,6 +521,35 @@ document.getElementById('f').addEventListener('submit', async (e) => {
 
   app.get('/health', async () => ({ ok: true, taskQueue: TASK_QUEUE, namespace: NAMESPACE }));
 
+  // --- B59: a small, deterministic, OFFLINE GraphQL test endpoint. Resolves a
+  // tiny fixed schema so a known query (with variables) yields known data, and
+  // returns GraphQL `errors` for an unknown field so the negative case fails
+  // clearly. (Used by the GraphQL step's known-input/expected-output checks.)
+  const GQL_USERS: Record<string, { id: string; name: string; planet: string }> = {
+    '1': { id: '1', name: 'Alan', planet: 'Earth' },
+    '7': { id: '7', name: 'Ada', planet: 'Earth' },
+  };
+  app.post('/test/graphql', async (request, reply) => {
+    const body = (request.body ?? {}) as { query?: string; variables?: Record<string, unknown> };
+    const query = typeof body.query === 'string' ? body.query : '';
+    const variables = body.variables ?? {};
+    if (!query.trim()) { reply.code(400); return { errors: [{ message: 'missing GraphQL query' }] }; }
+    if (/\buser\b/.test(query)) {
+      let id = variables && (variables as any).id != null ? String((variables as any).id) : null;
+      const inline = query.match(/user\s*\(\s*id\s*:\s*"([^"]+)"/);
+      if (!id && inline) id = inline[1];
+      const u = id != null ? GQL_USERS[id] : undefined;
+      if (!u) return { errors: [{ message: `no user with id ${JSON.stringify(id)}` }] };
+      const out: Record<string, unknown> = { id: u.id };
+      if (/\bname\b/.test(query)) out.name = u.name;
+      if (/\bplanet\b/.test(query)) out.planet = u.planet;
+      return { data: { user: out } };
+    }
+    if (/\bhero\b/.test(query)) return { data: { hero: { name: 'R2-D2' } } };
+    // Unknown field -> GraphQL error (standard 200 + errors).
+    return { errors: [{ message: 'Cannot query requested field on type Query' }] };
+  });
+
   // --- B12: serve the visual canvas (static frontend) at '/'. ---
   await app.register(fastifyStatic, {
     root: path.join(process.cwd(), 'public'),
