@@ -519,6 +519,70 @@ export function jsonToXml(obj: any): string {
   return buildXml('root', obj);
 }
 
+// ---- RSS Read step (B60) -----------------------------------------------------
+// Fetch an RSS/Atom feed from a URL and turn its entries into one item per
+// entry (carrying title/link/publication date etc). An unreachable/invalid feed
+// surfaces as a genuine failure, not a fake/empty success.
+
+export interface RssReadInput {
+  /** Absolute feed URL. */
+  url: string;
+  /** The items received from upstream (ignored; the feed is the source). */
+  input: Items;
+}
+
+function rssText(v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object' && '_' in v) return String((v as any)._);
+  return String(v);
+}
+
+// Extract a link string from an RSS <link> or Atom <link href="..."> shape.
+function rssLink(v: any): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) { for (const e of v) { const l = rssLink(e); if (l) return l; } return null; }
+  if (typeof v === 'object') {
+    if (v.$ && v.$.href) return String(v.$.href);
+    if ('_' in v) return String(v._);
+  }
+  return null;
+}
+
+export async function rssRead(args: RssReadInput): Promise<Items> {
+  if (!args.url || !/^https?:\/\//.test(args.url)) {
+    throw new Error('RSS Read: a valid absolute feed URL is required');
+  }
+  const res = await fetch(args.url, { headers: { accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' } });
+  if (!res.ok) throw new Error(`RSS Read: feed fetch failed with status ${res.status}`);
+  const text = await res.text();
+  let doc: Record<string, any>;
+  try { doc = parseXmlToJson(text); } catch { throw new Error('RSS Read: feed is not valid XML'); }
+  const asArray = (v: any) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+  let entries: Record<string, unknown>[];
+  if (doc.rss && doc.rss.channel) {
+    entries = asArray(doc.rss.channel.item).map((it: any) => ({
+      title: rssText(it.title),
+      link: rssLink(it.link),
+      pubDate: rssText(it.pubDate) ?? rssText(it.date),
+      guid: rssText(it.guid),
+      contentSnippet: rssText(it.description),
+    }));
+  } else if (doc.feed) {
+    entries = asArray(doc.feed.entry).map((e: any) => ({
+      title: rssText(e.title),
+      link: rssLink(e.link),
+      pubDate: rssText(e.updated) ?? rssText(e.published),
+      guid: rssText(e.id),
+      contentSnippet: rssText(e.summary) ?? rssText(e.content),
+    }));
+  } else {
+    throw new Error('RSS Read: could not find feed entries (not a recognised RSS/Atom feed)');
+  }
+  return entries.map((e): Item => makeItem(e, {}));
+}
+
 // ---- GraphQL step (B59) ------------------------------------------------------
 // Send a GraphQL query (with optional variables) to a configured endpoint via a
 // REAL HTTP POST and place the response data onto the item. GraphQL `errors` (or

@@ -550,6 +550,41 @@ document.getElementById('f').addEventListener('submit', async (e) => {
     return { errors: [{ message: 'Cannot query requested field on type Query' }] };
   });
 
+  // --- B60: a small, deterministic, OFFLINE RSS feed with KNOWN entries, so the
+  // RSS Read step's known-feed/expected-entries check is reachable and reproducible.
+  app.get('/test/rss', async (request, reply) => {
+    reply.header('content-type', 'application/rss+xml; charset=utf-8');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed</title>
+    <link>https://example.test/</link>
+    <description>A deterministic test feed</description>
+    <item>
+      <title>First Post</title>
+      <link>https://example.test/first</link>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+      <guid>first</guid>
+      <description>The first entry</description>
+    </item>
+    <item>
+      <title>Second Post</title>
+      <link>https://example.test/second</link>
+      <pubDate>Tue, 02 Jan 2024 00:00:00 GMT</pubDate>
+      <guid>second</guid>
+      <description>The second entry</description>
+    </item>
+    <item>
+      <title>Third Post</title>
+      <link>https://example.test/third</link>
+      <pubDate>Wed, 03 Jan 2024 00:00:00 GMT</pubDate>
+      <guid>third</guid>
+      <description>The third entry</description>
+    </item>
+  </channel>
+</rss>`;
+  });
+
   // --- B12: serve the visual canvas (static frontend) at '/'. ---
   await app.register(fastifyStatic, {
     root: path.join(process.cwd(), 'public'),

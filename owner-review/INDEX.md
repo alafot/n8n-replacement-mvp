@@ -204,7 +204,7 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 | D2 | XML | ✅ satisfied | seed(xml) → XML→JSON ⇒ {order:{$:{id:7},item:book}} | `xml/xml-success.png` |
 | D3 | Markdown | ✅ satisfied | seed(md) → MD→HTML ⇒ `<h1>Hello</h1>…<strong>bold</strong>` | `markdown/markdown-success.png` |
 | D4 | Crypto | ✅ satisfied | seed('hello') → SHA256 ⇒ 2cf24dba…b9824 (known vector) | `crypto/crypto-success.png` |
-| D5 | GraphQL | _pending_ | — | — |
+| D5 | GraphQL | ✅ satisfied | GraphQL user(id:7){id name} ⇒ {user:{id:7,name:Ada}} | `graphql/graphql-success.png` |
 | D6 | RSS Read | _pending_ | — | — |
 
 ### Phase D · D1 — HTML Extract ✅
@@ -226,6 +226,11 @@ Extending coverage with the deferred self-contained content/format nodes. Same p
 - Sample: seed (`{value:'hello'}`) → **Crypto** (Hash, SHA256, → `hash`) → sink. Run **completed**.
 - Verified (known test vector): `SHA256('hello')` = `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824` — exact match, deterministic; source preserved. Committed + pushed.
 - Screenshot: `crypto/crypto-success.png`. Demo: `crypto/demo.mjs`.
+
+### Phase D · D5 — GraphQL ✅
+- Sample: **GraphQL** step → local test endpoint `/test/graphql`, query `user(id:$id){id name}`, variables `{id:"7"}`, → `data` → sink. Run **completed**.
+- Verified (known query → expected): response `{data:{user:{id:"7",name:"Ada"}}}` — a real HTTP round-trip; variables genuinely affect output (examiner: id 1 → Alan), and a bad query fails clearly. Committed + pushed.
+- Screenshot: `graphql/graphql-success.png`. Demo: `graphql/demo.mjs`.
 
 ## Post-review fixes
 

@@ -130,7 +130,11 @@ encode/decode — writing the result to a chosen output field. The GraphQL step
 sends a GraphQL query (with optional variables) to a configured endpoint via a
 real HTTP POST and places the response data onto the item; GraphQL errors or an
 unreachable endpoint surface as a clear run failure (a small offline test
-GraphQL endpoint is served at `POST /test/graphql`). The Switch
+GraphQL endpoint is served at `POST /test/graphql`). The RSS Read step fetches
+an RSS/Atom feed from a URL and turns its entries into one item per entry
+(title, link, publication date); an unreachable or invalid feed surfaces as a
+clear run failure (a small offline test feed is served at `GET /test/rss`). The
+Switch
 step does multi-way per-item routing: configure a set of rules (each routes
 matching items to its own output), with an optional fallback output for items
 matching no rule. The Filter step keeps only the items matching a condition on a

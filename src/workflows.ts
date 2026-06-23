@@ -48,7 +48,7 @@ function deepestCause(err: any): string {
 /** Per-step status/output of a run, keyed by node id (B17). Queryable live. */
 export const getStepsQuery = defineQuery<Record<string, StepState>>('getSteps');
 
-const { httpRequest, runCode, runTransform, extractHtml, convertXml, convertMarkdown, cryptoOp, graphqlQuery } = proxyActivities<typeof activities>({
+const { httpRequest, runCode, runTransform, extractHtml, convertXml, convertMarkdown, cryptoOp, graphqlQuery, rssRead } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: {
     // Fail reasonably fast on a genuine error (e.g. unreachable host) so a
@@ -148,6 +148,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
         variables = p.variables;
       }
       return { main: await graphqlQuery({ endpoint: String(p.endpoint ?? ''), query: String(p.query ?? ''), variables, outputName: String(p.outputName ?? 'data'), input }) };
+    }
+    case 'rssRead': {
+      const p = node.params as any;
+      return { main: await rssRead({ url: String(p.url ?? ''), input }) };
     }
     case 'if': {
       const decision = evaluateCondition(node.params.condition as Condition, input[0]);
