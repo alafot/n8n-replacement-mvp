@@ -136,7 +136,9 @@ Limit step caps how many items pass through (keep first or last N). The Remove
 Duplicates step keeps only distinct items (by a key field or whole item). The
 Rename Keys step renames fields (old → new) while preserving values and other
 fields. The Date & Time step performs a date operation (add/subtract a span, or
-format) and writes the result onto each item.
+format) and writes the result onto each item. The Summarize step computes
+summary statistics (sum/count/avg/min/max) over items, optionally grouped by a
+field.
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

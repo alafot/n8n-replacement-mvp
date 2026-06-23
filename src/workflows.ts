@@ -219,6 +219,36 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
         }),
       };
     }
+    case 'summarize': {
+      // Summary statistics over items, optionally grouped by a field.
+      const p = node.params as any;
+      const func = p.func ?? 'sum';
+      const field = String(p.field ?? 'json.amount');
+      const groupBy = String(p.groupBy ?? '');
+      const outName = String(p.outputName ?? 'total');
+      const agg = (items: Items): number | null => {
+        const nums = items.map((it) => Number(getPath(it, field))).filter((n) => !Number.isNaN(n));
+        switch (func) {
+          case 'count': return items.length;
+          case 'sum': return nums.reduce((a, b) => a + b, 0);
+          case 'avg': return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+          case 'min': return nums.length ? Math.min(...nums) : null;
+          case 'max': return nums.length ? Math.max(...nums) : null;
+          default: return null;
+        }
+      };
+      if (!groupBy) return { main: [{ json: { [outName]: agg(input) }, binary: {} }] };
+      const groups = new Map<string, { label: unknown; items: Items }>();
+      const order: string[] = [];
+      for (const it of input) {
+        const label = getPath(it, groupBy);
+        const key = JSON.stringify(label);
+        if (!groups.has(key)) { groups.set(key, { label, items: [] }); order.push(key); }
+        groups.get(key)!.items.push(it);
+      }
+      const leaf = groupBy.split('.').pop() ?? 'group';
+      return { main: order.map((key) => { const g = groups.get(key)!; return { json: { [leaf]: g.label as any, [outName]: agg(g.items) }, binary: {} }; }) };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

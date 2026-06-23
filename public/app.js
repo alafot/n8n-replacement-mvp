@@ -13,6 +13,7 @@ const STEP_TYPES = [
   { type: 'removeDuplicates', label: 'Remove duplicates', hint: 'Remove Duplicates', category: 'Transform', icon: '🧹', desc: 'Drop duplicate items, keeping only the distinct ones.' },
   { type: 'renameKeys', label: 'Rename keys', hint: 'Rename Keys', category: 'Transform', icon: '🏷️', desc: 'Rename fields (old name → new name), preserving values and other fields.' },
   { type: 'dateTime', label: 'Date & time', hint: 'Date & Time', category: 'Transform', icon: '📅', desc: 'Format a date or add/subtract a span, writing the result onto the item.' },
+  { type: 'summarize', label: 'Summarize', hint: 'Summarize', category: 'Transform', icon: '🧮', desc: 'Compute summary statistics (sum/count/avg/min/max), optionally grouped by a field.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -61,6 +62,7 @@ function defaultParams(type) {
   if (type === 'removeDuplicates') return { by: 'field', field: 'json.id' };
   if (type === 'renameKeys') return { renames: { first: 'name' } };
   if (type === 'dateTime') return { operation: 'add', dateField: 'json.date', amount: 1, unit: 'days', format: 'YYYY-MM-DD', outputName: 'result' };
+  if (type === 'summarize') return { func: 'sum', field: 'json.amount', groupBy: '', outputName: 'total' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -549,6 +551,15 @@ function renderConfig() {
       c.appendChild(field('Unit', 'cfg-dt-unit', us));
     }
     c.appendChild(field('Output field name', 'cfg-dt-output', input(n.params.outputName ?? 'result', (v) => (n.params.outputName = v))));
+  } else if (n.type === 'summarize') {
+    n.params.func = n.params.func ?? 'sum';
+    const sel = document.createElement('select');
+    for (const f of ['sum', 'count', 'avg', 'min', 'max']) { const o = document.createElement('option'); o.value = f; o.textContent = f; if (n.params.func === f) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.func = sel.value; });
+    c.appendChild(field('Function', 'cfg-sum-func', sel));
+    c.appendChild(field('Field (path, numeric)', 'cfg-sum-field', input(n.params.field ?? 'json.amount', (v) => (n.params.field = v))));
+    c.appendChild(field('Group by (path, optional)', 'cfg-sum-groupby', input(n.params.groupBy ?? '', (v) => (n.params.groupBy = v))));
+    c.appendChild(field('Output field name', 'cfg-sum-output', input(n.params.outputName ?? 'total', (v) => (n.params.outputName = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

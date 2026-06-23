@@ -25,7 +25,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 12 | Limit | ✅ satisfied | seed(5 items) → Limit(max 2, first) ⇒ [1,2] | `limit/limit-success.png` |
 | 13 | Remove Duplicates | ✅ satisfied | seed ids[1,2,2,3,1] → Remove Dups ⇒ [1,2,3] | `remove-duplicates/remove-duplicates-success.png` |
 | 14 | Rename Keys | ✅ satisfied | {first,qty,city} → Rename ⇒ {name,quantity,city} | `rename-keys/rename-keys-success.png` |
-| 15 | Date & Time | _pending_ | — | — |
+| 15 | Date & Time | ✅ satisfied | seed{date:2026-01-01} → add 1 day ⇒ 2026-01-02 | `date-and-time/date-and-time-success.png` |
 | 16 | Summarize | _pending_ | — | — |
 | 17 | Compare Datasets | _pending_ | — | — |
 | 18 | Schedule (trigger) | _pending_ | — | — |
@@ -121,3 +121,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: output `{name:'Ada', quantity:3, city:'London'}` — old keys gone, new keys present with the same values, multiple mappings applied together, and the unreferenced field `city` left untouched.
 - Screenshot: `rename-keys/rename-keys-success.png`. Demo: `rename-keys/demo.mjs`.
 - Assumptions: mappings entered as JSON (`{"old":"new"}`), the node's config format.
+
+### Node 15 — Date & Time ✅
+- Sample: seed (`{date:'2026-01-01', label:'newyear'}`) → **Date & Time** (operation: add, 1 day, → `result`) → sink. Ran on the real engine; run **completed**.
+- Verified (known input → expected output): `result` = `2026-01-02` (returned as ISO `2026-01-02T00:00:00.000Z`) — Jan 1 + 1 day correctly computed — with the original `date` and `label` preserved. (Examiner also confirmed the format operation: `2026-01-01` as DD/MM/YYYY → `01/01/2026`.)
+- Screenshot: `date-and-time/date-and-time-success.png`. Demo: `date-and-time/demo.mjs`.
+- Assumptions: demoed the add operation; the node also offers subtract and format. (Note: add/subtract return a full ISO timestamp; the format operation returns a plain formatted string.)
