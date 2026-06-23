@@ -253,6 +253,14 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       // Entry-point trigger: emits one item carrying the fire time, starting the
       // downstream flow. (Firing is driven by the scheduler in the API.)
       return { main: [{ json: { source: 'schedule', firedAt: new Date().toISOString() }, binary: {} }] };
+    case 'webhookTrigger': {
+      // Entry-point trigger: emits the inbound request's payload (injected at
+      // fire time by the API webhook endpoint), starting the downstream flow.
+      const wp = node.params as any;
+      const json: Record<string, unknown> = { ...(wp._payload ?? {}) };
+      if (wp._query && Object.keys(wp._query).length) json._query = wp._query;
+      return { main: [{ json, binary: {} }] };
+    }
     case 'noop':
       // True no-op: pass items straight through, unchanged.
       return { main: input };

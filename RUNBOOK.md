@@ -142,7 +142,9 @@ field. The Compare Datasets step takes two inputs (A and B) and a key, splitting
 items into matched / only-in-A / only-in-B on three distinct outputs. The
 Schedule trigger is an entry-point step that fires real runs on a configured
 interval (`POST /definitions/:id/schedule/start` | `/stop`, or the Start/Stop
-buttons in its config).
+buttons in its config). The Webhook trigger is an entry-point step that fires a
+run carrying the request payload when an HTTP request hits its path — send a
+request to `/webhook/<path>` (the automation must be saved).
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

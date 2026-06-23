@@ -28,7 +28,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 15 | Date & Time | ✅ satisfied | seed{date:2026-01-01} → add 1 day ⇒ 2026-01-02 | `date-and-time/date-and-time-success.png` |
 | 16 | Summarize | ✅ satisfied | seed[A:10,B:5,A:7] → sum group by cat ⇒ A=17,B=5 | `summarize/summarize-success.png` |
 | 17 | Compare Datasets | ✅ satisfied | A[1,2,3] vs B[2,3,4] ⇒ matched[2,3]/onlyA[1]/onlyB[4] | `compare-datasets/compare-datasets-success.png` |
-| 18 | Schedule (trigger) | _pending_ | — | — |
+| 18 | Schedule (trigger) | ✅ satisfied | Schedule(0.5s)→sink; started ⇒ 6 real runs in history | `schedule-trigger/schedule-trigger-success.png` |
 | 19 | Webhook (trigger) | _pending_ | — | — |
 | 20 | Respond to Webhook | _pending_ | — | — |
 | 21 | Form (trigger) | _pending_ | — | — |
@@ -144,3 +144,11 @@ and saved a screenshot of the **successful run** here for you to double-check.
 **DATA group complete** (nodes 9–17: Aggregate, Split Out, Sort, Limit, Remove Duplicates, Rename Keys, Date & Time, Summarize, Compare Datasets). Only the TRIGGER group (18–22) remains.
 
 > **⚠️ Decision flagged for your review (triggers):** The original roadmap (seq 244) deferred the *trigger execution model* — "reuse the existing run model vs. design-first" — until the trigger phase. Since you're asleep and authorised finishing all node types, I'm proceeding by specifying each trigger's **capability and configuration** and leaving the *execution mechanism* (whether a trigger fires fully live — a real timer/HTTP listener — vs. is a configured trigger node you start, as fits a spike) to the implementer, requiring the trigger-specific behaviour to be real and demonstrable. Please confirm/redirect this in the morning if you wanted a specific trigger model.
+>
+> **Update:** the implementer chose a **genuinely live** execution model — the Schedule trigger really fires runs on a timer (6 real runs recorded in history at a 0.5s interval). So triggers are live, not cosmetic.
+
+### Node 18 — Schedule (trigger) ✅ (first TRIGGER node)
+- Sample: **Schedule trigger** (interval 0.5s) → sink. Saved the automation, clicked **Start schedule**, let it fire, clicked **Stop schedule**.
+- Verified: the schedule genuinely initiated runs as the entry point — **6 real runs** recorded in History (all `completed`), governed by the configured interval (examiner separately confirmed shorter interval → more fires). Persists across save/reload; acts as a starting step (no incoming connection).
+- Screenshot: `schedule-trigger/schedule-trigger-success.png` (History showing the scheduled runs + the trigger's Start/Stop controls). Demo: `schedule-trigger/demo.mjs`.
+- Assumptions: execution model = live timer (implementer's choice, see flag above); demoed at 0.5s and stopped it after ~2.8s.

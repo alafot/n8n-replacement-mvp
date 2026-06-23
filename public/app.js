@@ -5,6 +5,7 @@
 
 const STEP_TYPES = [
   { type: 'scheduleTrigger', label: 'Schedule trigger', hint: 'Schedule', category: 'Trigger', icon: '⏰', desc: 'Entry point: starts the automation on a configured schedule (interval).' },
+  { type: 'webhookTrigger', label: 'Webhook trigger', hint: 'Webhook', category: 'Trigger', icon: '🪝', desc: 'Entry point: starts the automation when an HTTP request hits its path, carrying the payload.' },
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
@@ -67,6 +68,7 @@ function defaultParams(type) {
   if (type === 'summarize') return { func: 'sum', field: 'json.amount', groupBy: '', outputName: 'total' };
   if (type === 'compareDatasets') return { keyField: 'json.id' };
   if (type === 'scheduleTrigger') return { intervalSeconds: 1 };
+  if (type === 'webhookTrigger') return { path: 'hook' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -634,6 +636,15 @@ function renderConfig() {
     stopBtn.addEventListener('click', async () => { if (!state.defId) return; await fetch('/definitions/' + state.defId + '/schedule/stop', { method: 'POST' }); $('#run-status').textContent = 'schedule stopped'; });
     const wrap = document.createElement('div'); wrap.style.marginTop = '8px'; wrap.append(startBtn, stopBtn);
     c.appendChild(wrap);
+  } else if (n.type === 'webhookTrigger') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Entry point. A request to this path starts a run carrying the request payload.';
+    c.appendChild(note);
+    n.params.path = n.params.path ?? 'hook';
+    const urlEl = document.createElement('input');
+    const refreshUrl = () => { urlEl.value = location.origin + '/webhook/' + (n.params.path || ''); };
+    c.appendChild(field('Path', 'cfg-webhook-path', input(n.params.path, (v) => { n.params.path = v; refreshUrl(); })));
+    urlEl.readOnly = true; refreshUrl();
+    c.appendChild(field('Listening URL', 'webhook-url', urlEl));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

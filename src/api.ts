@@ -281,6 +281,30 @@ async function main(): Promise<void> {
     return reply.send({ stopped: true });
   });
 
+  // --- B50: Webhook trigger — an inbound request to the configured path starts
+  // a real run carrying the request's payload. ---
+  app.route({
+    method: ['GET', 'POST', 'PUT'],
+    url: '/webhook/*',
+    handler: async (request, reply) => {
+      const wpath = (request.params as any)['*'];
+      for (const { id } of listDefinitions()) {
+        const def = getDefinition(id);
+        if (!def) continue;
+        const trig = (def.graph.nodes as any[]).find((n) => n.type === 'webhookTrigger' && String(n.params?.path ?? '') === wpath);
+        if (!trig) continue;
+        // Inject the request payload into the webhook trigger node, then fire.
+        const graph = JSON.parse(JSON.stringify(def.graph));
+        const wt = (graph.nodes as any[]).find((n) => n.type === 'webhookTrigger' && String(n.params?.path ?? '') === wpath);
+        wt.params._payload = request.body && typeof request.body === 'object' ? request.body : {};
+        wt.params._query = request.query ?? {};
+        const runId = await startGraphRun(graph as GraphDef, def.name, def.id);
+        return reply.code(202).send({ fired: true, runId, definitionId: def.id });
+      }
+      return reply.code(404).send({ fired: false, error: `no webhook registered for path '${wpath}'` });
+    },
+  });
+
   // --- B22: export an automation to n8n-compatible workflow JSON. ---
   app.post('/export/n8n', async (request, reply) => {
     const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDef };

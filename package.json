@@ -39,7 +39,8 @@
     "e2e:datetime": "node e2e/datetime.mjs",
     "e2e:summarize": "node e2e/summarize.mjs",
     "e2e:compare-datasets": "node e2e/compare-datasets.mjs",
-    "e2e:schedule": "node e2e/schedule.mjs"
+    "e2e:schedule": "node e2e/schedule.mjs",
+    "e2e:webhook": "node e2e/webhook.mjs"
   },
   "dependencies": {
     "@fastify/static": "^8.3.0",
