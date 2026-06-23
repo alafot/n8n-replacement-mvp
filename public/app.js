@@ -836,13 +836,35 @@ document.addEventListener('mouseup', (ev) => {
     addNode(pd.type, { x: ev.clientX - r.left, y: ev.clientY - r.top }); // create AT the drop position
   }
 });
-$('#btn-new').addEventListener('click', () => { state.nodes = []; state.connections = []; state.selectedId = null; state.defId = null; state.lastSteps = {}; history.replaceState(null, '', location.pathname); render(); });
+$('#btn-new').addEventListener('click', () => { state.nodes = []; state.connections = []; state.selectedId = null; state.defId = null; state.lastSteps = {}; $('#automation-name').value = 'My automation'; const rs = $('#run-status'); rs.textContent = ''; delete rs.dataset.defId; history.replaceState(null, '', location.pathname); render(); });
 $('#btn-save').addEventListener('click', save);
-$('#btn-load').addEventListener('click', async () => {
+// Load via a point-and-pick list of saved automations BY NAME (B54).
+async function openLoadList() {
   const list = await fetch('/definitions').then((r) => r.json());
-  const id = prompt('Load which definition id?\n' + list.map((d) => d.id + '  (' + d.name + ')').join('\n'));
-  if (id) loadById(id.trim());
-});
+  const rows = $('#load-rows');
+  rows.innerHTML = '';
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.dataset.testid = 'load-empty';
+    empty.style.cssText = 'color:#868e96; font-size:13px; padding:8px 0;';
+    empty.textContent = 'No saved automations yet — build one and Save it.';
+    rows.appendChild(empty);
+  } else {
+    for (const d of list) {
+      const row = document.createElement('button');
+      row.className = 'load-item';
+      row.dataset.testid = 'load-item';
+      row.dataset.defId = d.id;
+      row.style.cssText = 'display:block; width:100%; text-align:left; padding:9px 11px; margin-bottom:6px; border:1px solid #d4d8e0; border-radius:8px; background:#fbfcfe; cursor:pointer; font-size:13px;';
+      row.innerHTML = '<strong data-testid="load-item-name">' + d.name + '</strong>';
+      row.addEventListener('click', () => { $('#load-panel').style.display = 'none'; loadById(d.id); });
+      rows.appendChild(row);
+    }
+  }
+  $('#load-panel').style.display = 'block';
+}
+$('#btn-load').addEventListener('click', openLoadList);
+$('#btn-load-close').addEventListener('click', () => { $('#load-panel').style.display = 'none'; });
 $('#btn-run').addEventListener('click', run);
 
 // Run history (B23): list past runs with automation, time, and outcome.

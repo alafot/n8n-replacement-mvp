@@ -32,7 +32,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 19 | Webhook (trigger) | ✅ satisfied | POST /webhook/review-hook ⇒ run fired, payload {order:123} downstream | `webhook-trigger/webhook-trigger-success.png` |
 | 20 | Respond to Webhook | ✅ satisfied | webhook→double→respond(201); POST{order:21} ⇒ caller gets 201 {doubled:42} | `respond-to-webhook/respond-to-webhook-success.png` |
 | 21 | Form (trigger) | ✅ satisfied | served form /form/signup; submit {name:Ada,qty:3} ⇒ run carries them | `form-trigger/form-trigger-success.png` |
-| 22 | Error Trigger | _pending_ | — | — |
+| 22 | Error Trigger | ✅ satisfied | target(StopError) fails → handler auto-runs w/ {error,failedRunId} | `error-trigger/error-trigger-success.png` |
 
 ## Notes log
 
@@ -170,3 +170,25 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the form genuinely rendered the configured fields; submitting it fired a real durable run, and the downstream step received exactly `{name:'Ada', qty:'3'}`. Entry point (no incoming connection); form config persists across save/reload.
 - Screenshot: `form-trigger/form-trigger-success.png` (the served form, filled, showing "Submitted — run …"). Demo: `form-trigger/demo.mjs`.
 - Assumptions: simple text fields; qty arrives as a string ("3") as entered in the form.
+
+### Node 22 — Error Trigger ✅ (completes the roadmap)
+- Two sample automations: a **target** (seed → Stop and Error 'target boom') and a **handler** (Error Trigger linked to the target → sink). Both saved; then ran the target by reference so it genuinely failed.
+- Verified: when the target failed, the **handler ran automatically**, its downstream receiving the real failure details `{failedAutomationId: <target>, failedRunId: <run>, error: "target boom"}`. History shows the target `failed` and the handler `completed`. (Examiner also confirmed that when the target succeeds, the handler does not run.) Entry point; linkage persists across save/reload.
+- Screenshot: `error-trigger/error-trigger-success.png` (History: target failed + handler completed). Demo: `error-trigger/demo.mjs`.
+- Assumptions: linked the handler to one target automation via the node's dropdown.
+
+---
+## ✅ ALL NODE TYPES COMPLETE — 22/22 (+ palette redesign)
+
+Every node in the approved roadmap is implemented, satisfied by the chain, and demonstrated by a sample workflow with a successful-run screenshot (saved per-node above).
+
+- **FLOW (1–8):** Switch, Filter, Merge, Loop Over Items, Wait, No Operation, Stop and Error, Execute Sub-workflow
+- **DATA (9–17):** Aggregate, Split Out, Sort, Limit, Remove Duplicates, Rename Keys, Date & Time, Summarize, Compare Datasets
+- **TRIGGERS (18–22):** Schedule, Webhook, Respond to Webhook, Form, Error Trigger
+- **Builder UX:** palette redesign (n8n-style categories, compact icon buttons, hover tooltips)
+
+**For your morning review:**
+1. Skim this INDEX and the per-node screenshots in `owner-review/<node>/`.
+2. Test anything hands-on at **http://127.0.0.1:3000/** (the app is still running).
+3. **One decision to confirm:** the trigger execution model — triggers were built to fire **genuinely live** (real timer, real HTTP endpoints, real form, real failure-handling). Confirm you're happy with that, or redirect.
+4. A few demo automations were saved into the store (Doubler, Scheduled greeter, Webhook receiver/responder, Signup form, Failing target, Error handler) — fine to keep or delete.

@@ -154,6 +154,15 @@
         </div>
       </div>
     </div>
+    <div id="load-panel" data-testid="load-panel" style="display:none; position:fixed; inset:0; background:rgba(20,28,42,0.55); z-index:25;">
+      <div style="max-width:520px; margin:80px auto; background:#fff; border-radius:12px; padding:18px; max-height:70vh; overflow:auto;">
+        <div style="display:flex; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0; font-size:14px;">Open a saved automation</h2>
+          <button id="btn-load-close" data-testid="btn-load-close" style="margin-left:auto;">Close</button>
+        </div>
+        <div id="load-rows"></div>
+      </div>
+    </div>
     <div id="history-panel" data-testid="history-panel" style="display:none; position:fixed; inset:0; background:rgba(20,28,42,0.55); z-index:20;">
       <div style="max-width:760px; margin:60px auto; background:#fff; border-radius:12px; padding:18px; max-height:80vh; overflow:auto;">
         <div style="display:flex; align-items:center; margin-bottom:10px;">

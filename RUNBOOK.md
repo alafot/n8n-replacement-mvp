@@ -159,7 +159,8 @@ palette entry onto the canvas to drop it at a chosen location**), wire them toge
 anywhere on its body — for a branch step, drag from its T / F handle to choose
 the true/false route), **drag a step to reposition** it (its connections follow
 and the position is saved), select a step to configure its parameters, **Save**
-the automation (stored durably), reopen it later (`/?def=<id>`), and **Run** it
+the automation (stored durably), reopen a saved one via **Load…** (a
+point-and-pick list of saved automations by name) or `/?def=<id>`, and **Run** it
 with a single click — watching each step's status update live and inspecting any
 step's output. **Delete** a step via the × on the node — it asks for
 confirmation first, and confirming removes the step and all its connections.
