@@ -147,6 +147,9 @@ run carrying the request payload when an HTTP request hits its path — send a
 request to `/webhook/<path>` (the automation must be saved). The Respond to
 Webhook step (used downstream of a Webhook trigger) sends a custom HTTP status +
 body back to the caller, so the webhook request returns the automation's result.
+The Form trigger is an entry-point step that serves a web form at `/form/<path>`;
+submitting it starts a run carrying the entered values (the automation must be
+saved).
 
 From the canvas you can: add steps from the palette (click to add, or **drag a
 palette entry onto the canvas to drop it at a chosen location**), wire them together by

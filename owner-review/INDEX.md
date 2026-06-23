@@ -30,7 +30,7 @@ and saved a screenshot of the **successful run** here for you to double-check.
 | 17 | Compare Datasets | ✅ satisfied | A[1,2,3] vs B[2,3,4] ⇒ matched[2,3]/onlyA[1]/onlyB[4] | `compare-datasets/compare-datasets-success.png` |
 | 18 | Schedule (trigger) | ✅ satisfied | Schedule(0.5s)→sink; started ⇒ 6 real runs in history | `schedule-trigger/schedule-trigger-success.png` |
 | 19 | Webhook (trigger) | ✅ satisfied | POST /webhook/review-hook ⇒ run fired, payload {order:123} downstream | `webhook-trigger/webhook-trigger-success.png` |
-| 20 | Respond to Webhook | _pending_ | — | — |
+| 20 | Respond to Webhook | ✅ satisfied | webhook→double→respond(201); POST{order:21} ⇒ caller gets 201 {doubled:42} | `respond-to-webhook/respond-to-webhook-success.png` |
 | 21 | Form (trigger) | _pending_ | — | — |
 | 22 | Error Trigger | _pending_ | — | — |
 
@@ -158,3 +158,9 @@ and saved a screenshot of the **successful run** here for you to double-check.
 - Verified: the request genuinely fired a durable run (HTTP 202, runId returned), and the downstream step received exactly `{order:123, kind:'review'}`. A request to an unregistered path returns **404** with no run. Path persists across save/reload; entry point (no incoming connection).
 - Screenshot: `webhook-trigger/webhook-trigger-success.png` (the saved automation showing the live Listening URL). Demo: `webhook-trigger/demo.mjs`.
 - Assumptions: live HTTP endpoint (consistent with the live trigger model).
+
+### Node 20 — Respond to Webhook ✅
+- Sample: **Webhook trigger** (`respond-hook`) → code (doubles `order`) → **Respond to Webhook** (status 201, first item's data). Saved, then `POST {order:21}`.
+- Verified by the actual HTTP response the caller received: **HTTP 201** (non-default status) with body `{received:21, doubled:42, status:ok}` — carrying an automation-derived value (21×2=42), a genuine request/response round-trip, not a static ack. Used downstream of the trigger.
+- Screenshot: `respond-to-webhook/respond-to-webhook-success.png`. Demo: `respond-to-webhook/demo.mjs`.
+- Assumptions: demoed status 201 + first-item body mode; the node also offers a static JSON body.

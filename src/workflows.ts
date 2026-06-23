@@ -261,6 +261,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       if (wp._query && Object.keys(wp._query).length) json._query = wp._query;
       return { main: [{ json, binary: {} }] };
     }
+    case 'formTrigger':
+      // Entry-point trigger: emits the submitted form values (injected at submit
+      // time by the API form endpoint), starting the downstream flow.
+      return { main: [{ json: { ...((node.params as any)._payload ?? {}) }, binary: {} }] };
     case 'respondToWebhook': {
       // Build the HTTP response (status + body) for the webhook caller. The body
       // can carry automation-derived data (the first incoming item) or a static value.

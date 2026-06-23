@@ -6,6 +6,7 @@
 const STEP_TYPES = [
   { type: 'scheduleTrigger', label: 'Schedule trigger', hint: 'Schedule', category: 'Trigger', icon: '⏰', desc: 'Entry point: starts the automation on a configured schedule (interval).' },
   { type: 'webhookTrigger', label: 'Webhook trigger', hint: 'Webhook', category: 'Trigger', icon: '🪝', desc: 'Entry point: starts the automation when an HTTP request hits its path, carrying the payload.' },
+  { type: 'formTrigger', label: 'Form trigger', hint: 'Form', category: 'Trigger', icon: '📝', desc: 'Entry point: serves a web form; submitting it starts a run carrying the entered values.' },
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
@@ -71,6 +72,7 @@ function defaultParams(type) {
   if (type === 'scheduleTrigger') return { intervalSeconds: 1 };
   if (type === 'webhookTrigger') return { path: 'hook' };
   if (type === 'respondToWebhook') return { status: 200, bodyMode: 'firstItem', staticBody: '{}' };
+  if (type === 'formTrigger') return { path: 'form', fields: ['name'] };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -661,6 +663,17 @@ function renderConfig() {
     if (n.params.bodyMode === 'static') {
       c.appendChild(field('Static body (JSON)', 'cfg-respond-body', textarea(n.params.staticBody ?? '{}', (v) => (n.params.staticBody = v))));
     }
+  } else if (n.type === 'formTrigger') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Entry point. Save, then open the form URL; submitting it starts a run with the entered values.';
+    c.appendChild(note);
+    n.params.path = n.params.path ?? 'form';
+    n.params.fields = Array.isArray(n.params.fields) ? n.params.fields : ['name'];
+    const urlEl = document.createElement('input'); urlEl.readOnly = true;
+    const refreshUrl = () => { urlEl.value = location.origin + '/form/' + (n.params.path || ''); };
+    c.appendChild(field('Path', 'cfg-form-path', input(n.params.path, (v) => { n.params.path = v; refreshUrl(); })));
+    c.appendChild(field('Fields (comma-separated)', 'cfg-form-fields', input(n.params.fields.join(','), (v) => { n.params.fields = v.split(',').map((s) => s.trim()).filter(Boolean); })));
+    refreshUrl();
+    c.appendChild(field('Form URL', 'form-url', urlEl));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

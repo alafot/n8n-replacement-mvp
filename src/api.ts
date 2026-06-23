@@ -317,6 +317,51 @@ async function main(): Promise<void> {
     },
   });
 
+  // --- B52: Form trigger — serve a web form at /form/:path; submitting it
+  // starts a real run carrying the entered values. ---
+  const findFormDef = (formPath: string) => {
+    for (const { id } of listDefinitions()) {
+      const def = getDefinition(id);
+      const trig = def && (def.graph.nodes as any[]).find((n) => n.type === 'formTrigger' && String(n.params?.path ?? '') === formPath);
+      if (def && trig) return { def, trig };
+    }
+    return null;
+  };
+  app.get<{ Params: { path: string } }>('/form/:path', async (request, reply) => {
+    const found = findFormDef(request.params.path);
+    if (!found) return reply.code(404).type('text/html').send('<p>No form registered at this path.</p>');
+    const fields: string[] = Array.isArray(found.trig.params?.fields) ? found.trig.params.fields : [];
+    const inputs = fields
+      .map((f) => `<label style="display:block;margin:8px 0 2px;">${f}</label><input data-testid="form-field-${f}" data-field="${f}" />`)
+      .join('');
+    const html = `<!doctype html><meta charset="utf-8"><title>${found.def.name}</title>
+<body style="font-family:sans-serif;max-width:420px;margin:40px auto;">
+<h2 data-testid="form-title">${found.def.name}</h2>
+<form id="f">${inputs}<button type="submit" data-testid="form-submit" style="margin-top:12px;">Submit</button></form>
+<div data-testid="form-result"></div>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = {};
+  for (const inp of document.querySelectorAll('input[data-field]')) data[inp.dataset.field] = inp.value;
+  const r = await fetch(location.pathname, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) }).then((x) => x.json());
+  const res = document.querySelector('[data-testid=form-result]');
+  if (r.runId) { res.dataset.runId = r.runId; res.textContent = 'Submitted — run ' + r.runId; }
+  else { res.textContent = 'error: ' + (r.error || 'failed'); }
+});
+</script></body>`;
+    return reply.type('text/html').send(html);
+  });
+  app.post<{ Params: { path: string } }>('/form/:path', async (request, reply) => {
+    const found = findFormDef(request.params.path);
+    if (!found) return reply.code(404).send({ error: `no form at '${request.params.path}'` });
+    const graph = JSON.parse(JSON.stringify(found.def.graph));
+    const ft = (graph.nodes as any[]).find((n) => n.type === 'formTrigger' && String(n.params?.path ?? '') === request.params.path);
+    ft.params._payload = request.body && typeof request.body === 'object' ? request.body : {};
+    const runId = await startGraphRun(graph as GraphDef, found.def.name, found.def.id);
+    return reply.code(202).send({ submitted: true, runId, definitionId: found.def.id });
+  });
+
   // --- B22: export an automation to n8n-compatible workflow JSON. ---
   app.post('/export/n8n', async (request, reply) => {
     const { name, graph } = (request.body ?? {}) as { name?: string; graph?: GraphDef };
