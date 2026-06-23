@@ -191,4 +191,36 @@ Every node in the approved roadmap is implemented, satisfied by the chain, and d
 1. Skim this INDEX and the per-node screenshots in `owner-review/<node>/`.
 2. Test anything hands-on at **http://127.0.0.1:3000/** (the app is still running).
 3. **One decision to confirm:** the trigger execution model — triggers were built to fire **genuinely live** (real timer, real HTTP endpoints, real form, real failure-handling). Confirm you're happy with that, or redirect.
-4. A few demo automations were saved into the store (Doubler, Scheduled greeter, Webhook receiver/responder, Signup form, Failing target, Error handler) — fine to keep or delete.
+4. A few demo automations were saved into the store (Doubler, Scheduled greeter, Webhook receiver/responder, Signup form, Failing target, Error handler, Pick-me) — fine to keep or delete.
+
+---
+## Phase D — content/format nodes (autonomous run, 2026-06-23)
+
+Extending coverage with the deferred self-contained content/format nodes. Same pattern: each shipped via the chain, verified with a sample workflow + screenshot. Each is also committed and pushed to `git@github.com:deepopinion/n8n-replacement-poc.git` by the Builder (standing directive).
+
+| # | Node | Status | Sample workflow | Screenshot |
+|---|------|--------|-----------------|------------|
+| D1 | HTML Extract | _pending_ | — | — |
+| D2 | XML | _pending_ | — | — |
+| D3 | Markdown | _pending_ | — | — |
+| D4 | Crypto | _pending_ | — | — |
+| D5 | GraphQL | _pending_ | — | — |
+| D6 | RSS Read | _pending_ | — | — |
+
+## Post-review fixes
+
+### Select-to-load ✅ (Load UX defect)
+- Reported: **Load…** required typing a saved automation's identifier (a text prompt) instead of selecting one.
+- Fixed: clicking **Load** now opens a modal **list of saved automations by name**; you pick one with a click (no id typing), and it opens on the canvas with steps/connections/config/layout restored. Empty state when there are none; saving and reopening via a saved reference still work.
+- Verified: list showed the saved automations by name; clicking "Pick-me (review demo)" opened it (1 step restored).
+- Screenshots: `select-to-load/select-to-load-list.png` (the selectable list), `select-to-load/select-to-load-opened.png`. Demo: `select-to-load/demo.mjs`.
+
+### Complex demo automation ✅ ("Order processing & reporting (full demo)")
+- Built a large, coherent automation that exercises **all 26 node types** in one graph — **41 nodes, 35 connections** — saved as a loadable definition. Load it via **Load… → "Order processing & reporting (full demo)"**.
+- Shape: a main "order processing" spine (Schedule → generate orders → remove duplicates → rename → date math → sort → guard(If) → filter → Switch by category → Summarize / Aggregate / No-Op → Merge → Loop → Limit → Transform → Wait → report), with **Stop and Error** parked on the guard's untaken branch, plus tributaries showcasing HTTP Request, Split Out, Compare Datasets, Execute Sub-workflow (calls a saved "Enrich items (sub)"), and the Webhook/Respond, Form, and Error triggers.
+- Verified: loads all 41 nodes and **runs to completion** — 40 steps completed, 1 skipped (the Stop-and-Error, correctly not fired). Screenshot: `mega-demo/mega-demo-canvas.png`. Build script: `mega-demo/build.mjs`.
+
+### Walkthrough videos 🎥
+- **`videos/01-building.mp4`** (~28s) — a simulated human building an "order triage" automation from scratch in the builder: dragging steps into place, configuring filter/sort/branch, wiring them, saving, and running it live (taken branch completes, untaken branch is skipped). Visible cursor + on-screen captions.
+- **`videos/02-temporal-execution.mp4`** (~23s) — the *same run* opened inside **Temporal's own Web UI** (localhost:8233): status Completed, input/result, and the durable event-history timeline — showing each step ran as a real Temporal activity, replayable, not simulated.
+- Generator: `videos/make-videos.mjs` (Playwright recording).

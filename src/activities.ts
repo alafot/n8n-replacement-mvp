@@ -4,6 +4,7 @@
 
 import * as vm from 'vm';
 import { Items, Item, makeItem, BinaryDatum } from './itemFormat';
+import { getPath } from './graph';
 
 export interface HttpRequestInput {
   /** HTTP method; defaults to GET. */
@@ -172,6 +173,226 @@ export async function runTransform(args: TransformStepInput): Promise<Items> {
       for (const field of remove) delete json[field];
     }
 
+    return makeItem(json, { ...item.binary });
+  });
+}
+
+// ---- HTML Extract step (B55) -------------------------------------------------
+// Pull values out of an HTML string by CSS selector — either the matched
+// element's text or one of its named attributes — into named output fields.
+
+export interface HtmlExtractRule {
+  /** CSS selector locating the element (e.g. 'h1', 'a.cta', '#price'). */
+  selector: string;
+  /** 'text' = the element's text content; 'attribute' = a named attribute. */
+  returnType?: 'text' | 'attribute';
+  /** Attribute name to read when returnType is 'attribute' (e.g. 'href'). */
+  attribute?: string;
+  /** Field name to write the extracted value into on each item's json. */
+  output: string;
+}
+
+export interface HtmlExtractInput {
+  /** Dot-path to the HTML string on each item (e.g. 'json.body'). */
+  htmlField: string;
+  /** One or more extraction rules, each producing one output field. */
+  rules: HtmlExtractRule[];
+  /** The items received from upstream. */
+  input: Items;
+}
+
+// --- Genuine (compact) HTML parser + CSS selector engine ---------------------
+interface ElNode { type: 'el'; tag: string; attribs: Record<string, string>; children: DomNode[]; }
+interface TextNode { type: 'text'; text: string; }
+type DomNode = ElNode | TextNode;
+
+// Elements that never have a closing tag (so they don't nest the following content).
+const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_m, d) => { try { return String.fromCodePoint(Number(d)); } catch { return _m; } })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _m; } })
+    .replace(/&amp;/g, '&');
+}
+
+function parseTag(inner: string): { tag: string; attribs: Record<string, string> } {
+  const m = inner.match(/^\s*([a-zA-Z][\w:-]*)/);
+  const tag = (m ? m[1] : '').toLowerCase();
+  const attribs: Record<string, string> = {};
+  const rest = inner.slice(m ? m[0].length : 0);
+  const re = /([^\s=\/]+)(\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'`=<>]+)))?/g;
+  let a: RegExpExecArray | null;
+  while ((a = re.exec(rest))) {
+    if (!a[1]) break;
+    const name = a[1].toLowerCase();
+    let val = '';
+    if (a[2] !== undefined) {
+      val = a[4] !== undefined ? a[4] : a[5] !== undefined ? a[5] : (a[6] ?? '');
+    }
+    attribs[name] = decodeEntities(val);
+  }
+  return { tag, attribs };
+}
+
+function parseHtml(html: string): ElNode {
+  const root: ElNode = { type: 'el', tag: '#root', attribs: {}, children: [] };
+  const stack: ElNode[] = [root];
+  const top = () => stack[stack.length - 1];
+  let i = 0;
+  const n = html.length;
+  while (i < n) {
+    const lt = html.indexOf('<', i);
+    if (lt === -1) { top().children.push({ type: 'text', text: html.slice(i) }); break; }
+    if (lt > i) top().children.push({ type: 'text', text: html.slice(i, lt) });
+    if (html.startsWith('<!--', lt)) { const end = html.indexOf('-->', lt + 4); i = end === -1 ? n : end + 3; continue; }
+    if (html[lt + 1] === '!' || html[lt + 1] === '?') { const end = html.indexOf('>', lt); i = end === -1 ? n : end + 1; continue; }
+    if (html[lt + 1] === '/') {
+      const end = html.indexOf('>', lt);
+      const name = html.slice(lt + 2, end === -1 ? n : end).trim().toLowerCase();
+      for (let s = stack.length - 1; s >= 1; s--) { if (stack[s].tag === name) { stack.length = s; break; } }
+      i = end === -1 ? n : end + 1;
+      continue;
+    }
+    const end = html.indexOf('>', lt);
+    if (end === -1) { top().children.push({ type: 'text', text: html.slice(lt) }); break; }
+    let inner = html.slice(lt + 1, end);
+    let selfClose = false;
+    if (inner.endsWith('/')) { selfClose = true; inner = inner.slice(0, -1); }
+    const { tag, attribs } = parseTag(inner);
+    const el: ElNode = { type: 'el', tag, attribs, children: [] };
+    top().children.push(el);
+    if (!selfClose && !VOID_ELEMENTS.has(tag) && tag) stack.push(el);
+    i = end + 1;
+  }
+  return root;
+}
+
+interface Compound { tag?: string; ids: string[]; classes: string[]; attrs: { name: string; value?: string }[]; }
+
+function parseCompound(s: string): Compound {
+  const c: Compound = { ids: [], classes: [], attrs: [] };
+  const tagM = s.match(/^([a-zA-Z][\w:-]*|\*)/);
+  let rest = s;
+  if (tagM) { if (tagM[1] !== '*') c.tag = tagM[1].toLowerCase(); rest = s.slice(tagM[0].length); }
+  const re = /([.#][^.#\[\]]+)|(\[[^\]]*\])/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rest))) {
+    const tok = m[0];
+    if (tok[0] === '.') c.classes.push(tok.slice(1));
+    else if (tok[0] === '#') c.ids.push(tok.slice(1));
+    else {
+      const innerTok = tok.slice(1, -1);
+      const eq = innerTok.indexOf('=');
+      if (eq === -1) c.attrs.push({ name: innerTok.trim().toLowerCase() });
+      else {
+        let v = innerTok.slice(eq + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+        c.attrs.push({ name: innerTok.slice(0, eq).trim().toLowerCase(), value: v });
+      }
+    }
+  }
+  return c;
+}
+
+function classListOf(el: ElNode): string[] {
+  return (el.attribs['class'] ?? '').split(/\s+/).filter(Boolean);
+}
+
+function matchCompound(el: ElNode, c: Compound): boolean {
+  if (c.tag && el.tag !== c.tag) return false;
+  if (c.ids.length && !c.ids.every((id) => el.attribs['id'] === id)) return false;
+  if (c.classes.length) { const cls = classListOf(el); if (!c.classes.every((k) => cls.includes(k))) return false; }
+  for (const a of c.attrs) {
+    if (!(a.name in el.attribs)) return false;
+    if (a.value !== undefined && el.attribs[a.name] !== a.value) return false;
+  }
+  return true;
+}
+
+// Descendant-combinator match: the element (path tail) matches the last
+// compound, and each earlier compound matches some ancestor, in order.
+function matchPath(path: ElNode[], compounds: Compound[]): boolean {
+  let ci = compounds.length - 1;
+  let pi = path.length - 1;
+  if (ci < 0) return false;
+  if (!matchCompound(path[pi], compounds[ci])) return false;
+  ci--; pi--;
+  while (ci >= 0) {
+    let found = false;
+    while (pi >= 0) {
+      if (matchCompound(path[pi], compounds[ci])) { found = true; pi--; break; }
+      pi--;
+    }
+    if (!found) return false;
+    ci--;
+  }
+  return true;
+}
+
+// First element (document order) matching the CSS selector (comma = selector list).
+function querySelectorFirst(root: ElNode, selector: string): ElNode | null {
+  const groups = selector.split(',').map((g) => g.trim()).filter(Boolean).map((g) => g.split(/\s+/).filter(Boolean).map(parseCompound));
+  if (!groups.length) return null;
+  const path: ElNode[] = [];
+  let result: ElNode | null = null;
+  const visit = (node: ElNode) => {
+    for (const child of node.children) {
+      if (result) return;
+      if (child.type !== 'el') continue;
+      path.push(child);
+      if (groups.some((cs) => matchPath(path, cs))) { result = child; path.pop(); return; }
+      visit(child);
+      path.pop();
+    }
+  };
+  visit(root);
+  return result;
+}
+
+function textOf(el: ElNode): string {
+  let out = '';
+  const walk = (node: DomNode) => {
+    if (node.type === 'text') out += node.text;
+    else for (const ch of node.children) walk(ch);
+  };
+  for (const ch of el.children) walk(ch);
+  return decodeEntities(out).trim();
+}
+
+/**
+ * HTML Extract step (B55). For each item, locate its source HTML string, apply
+ * each CSS-selector rule (element text or a named attribute), and write the
+ * result into the configured output field. Other fields are preserved (it edits
+ * a copy of the item's json). Pure and deterministic.
+ */
+export async function extractHtml(args: HtmlExtractInput): Promise<Items> {
+  const rules = Array.isArray(args.rules) ? args.rules : [];
+  return args.input.map((item): Item => {
+    const raw = getPath(item, args.htmlField);
+    const html = typeof raw === 'string' ? raw : raw == null ? '' : String(raw);
+    const dom = parseHtml(html);
+    const json: Record<string, unknown> = { ...item.json };
+    for (const rule of rules) {
+      if (!rule || !rule.output) continue;
+      const el = querySelectorFirst(dom, String(rule.selector ?? ''));
+      let val: string | null = null;
+      if (el) {
+        if (rule.returnType === 'attribute') {
+          const attr = String(rule.attribute ?? '').toLowerCase();
+          val = attr in el.attribs ? el.attribs[attr] : null;
+        } else {
+          val = textOf(el);
+        }
+      }
+      json[rule.output] = val;
+    }
     return makeItem(json, { ...item.binary });
   });
 }

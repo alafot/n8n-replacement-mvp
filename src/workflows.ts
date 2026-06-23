@@ -48,7 +48,7 @@ function deepestCause(err: any): string {
 /** Per-step status/output of a run, keyed by node id (B17). Queryable live. */
 export const getStepsQuery = defineQuery<Record<string, StepState>>('getSteps');
 
-const { httpRequest, runCode, runTransform } = proxyActivities<typeof activities>({
+const { httpRequest, runCode, runTransform, extractHtml } = proxyActivities<typeof activities>({
   startToCloseTimeout: '30 seconds',
   retry: {
     // Fail reasonably fast on a genuine error (e.g. unreachable host) so a
@@ -123,6 +123,10 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
       return { main: await runCode({ code: String(node.params.code ?? ''), input }) };
     case 'transform':
       return { main: await runTransform({ config: node.params as any, input }) };
+    case 'htmlExtract': {
+      const p = node.params as any;
+      return { main: await extractHtml({ htmlField: String(p.htmlField ?? 'json.body'), rules: Array.isArray(p.rules) ? p.rules : [], input }) };
+    }
     case 'if': {
       const decision = evaluateCondition(node.params.condition as Condition, input[0]);
       return { [decision ? 'true' : 'false']: input };

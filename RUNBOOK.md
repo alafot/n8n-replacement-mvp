@@ -114,7 +114,11 @@ open http://127.0.0.1:3000/
 
 The left palette lists the available step types (Call a web service, Reshape
 data, Branch on a condition, Route by rules (Switch), Run a code snippet);
-clicking one places a step of the matching engine type on the canvas. The Switch
+clicking one places a step of the matching engine type on the canvas. The
+Extract from HTML step pulls values out of an HTML string by CSS selector: each
+rule names a selector and whether to take the matched element's text or one of
+its named attributes, writing the result into a chosen output field (other
+fields are preserved). The Switch
 step does multi-way per-item routing: configure a set of rules (each routes
 matching items to its own output), with an optional fallback output for items
 matching no rule. The Filter step keeps only the items matching a condition on a

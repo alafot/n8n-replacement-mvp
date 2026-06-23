@@ -10,6 +10,7 @@ const STEP_TYPES = [
   { type: 'errorTrigger', label: 'Error trigger', hint: 'Error Trigger', category: 'Trigger', icon: '⚠️', desc: 'Entry point: runs this automation when a linked target automation fails, with the failure details.' },
   { type: 'httpRequest', label: 'Call a web service', hint: 'HTTP request', category: 'Actions', icon: '🌐', desc: 'Call a web service with an HTTP request.' },
   { type: 'transform', label: 'Reshape data', hint: 'Transform / Set', category: 'Transform', icon: '✏️', desc: 'Reshape items — set, copy, rename and remove fields.' },
+  { type: 'htmlExtract', label: 'Extract from HTML', hint: 'HTML Extract', category: 'Transform', icon: '🔖', desc: 'Pull values out of HTML by CSS selector (element text or a named attribute) into named fields.' },
   { type: 'aggregate', label: 'Aggregate', hint: 'Aggregate', category: 'Transform', icon: '📊', desc: 'Collapse a field from many items into one item carrying all the collected values.' },
   { type: 'splitOut', label: 'Split out', hint: 'Split Out', category: 'Transform', icon: '✂️', desc: 'Expand an item\'s list field into multiple items, one per element.' },
   { type: 'sort', label: 'Sort', hint: 'Sort', category: 'Transform', icon: '↕️', desc: 'Reorder items by a chosen field, ascending or descending.' },
@@ -57,6 +58,7 @@ function nid() {
 function defaultParams(type) {
   if (type === 'httpRequest') return { method: 'GET', url: '' };
   if (type === 'transform') return { set: {}, copy: {}, rename: {}, remove: [] };
+  if (type === 'htmlExtract') return { htmlField: 'json.body', rules: [{ selector: 'h1', returnType: 'text', attribute: '', output: 'title' }] };
   if (type === 'if') return { condition: { left: 'json.value', op: 'gt', right: 0 } };
   if (type === 'switch') return { rules: [{ left: 'json.value', op: 'gt', right: 0 }], fallback: true };
   if (type === 'filter') return { condition: { left: 'json.value', op: 'gte', right: 0 } };
@@ -686,6 +688,37 @@ function renderConfig() {
     fetch('/definitions').then((r) => r.json()).then((list) => {
       for (const d of list) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name + ' (' + d.id.slice(0, 12) + '…)'; if (n.params.targetDefinitionId === d.id) o.selected = true; sel.appendChild(o); }
     }).catch(() => {});
+  } else if (n.type === 'htmlExtract') {
+    const note = document.createElement('div'); note.style.cssText = 'font-size:11px;color:#6b7280;margin-bottom:4px;'; note.textContent = 'Pull values out of the source HTML by CSS selector (element text or a named attribute) into named fields.';
+    c.appendChild(note);
+    n.params.htmlField = n.params.htmlField ?? 'json.body';
+    n.params.rules = Array.isArray(n.params.rules) ? n.params.rules : [];
+    c.appendChild(field('Source HTML field (path)', 'cfg-html-source', input(n.params.htmlField, (v) => (n.params.htmlField = v))));
+    const lab = document.createElement('label'); lab.textContent = 'Extraction rules (selector → field)';
+    c.appendChild(lab);
+    n.params.rules.forEach((rule, i) => {
+      rule.returnType = rule.returnType ?? 'text';
+      const row = document.createElement('div'); row.dataset.testid = 'extract-rule'; row.dataset.ruleIndex = String(i);
+      row.style.cssText = 'border:1px solid #e5e7eb;border-radius:6px;padding:6px;margin-bottom:6px;';
+      const selEl = input(rule.selector, (v) => (rule.selector = v)); selEl.placeholder = 'e.g. h1, a.cta, #price';
+      row.appendChild(field('CSS selector', `cfg-rule-${i}-selector`, selEl));
+      const ts = document.createElement('select');
+      for (const t of ['text', 'attribute']) { const o = document.createElement('option'); o.value = t; o.textContent = t === 'text' ? 'Element text' : 'Named attribute'; if (rule.returnType === t) o.selected = true; ts.appendChild(o); }
+      ts.addEventListener('change', () => { rule.returnType = ts.value; render(); });
+      row.appendChild(field('Extract', `cfg-rule-${i}-type`, ts));
+      if (rule.returnType === 'attribute') {
+        const at = input(rule.attribute ?? '', (v) => (rule.attribute = v)); at.placeholder = 'e.g. href';
+        row.appendChild(field('Attribute name', `cfg-rule-${i}-attr`, at));
+      }
+      row.appendChild(field('Into field', `cfg-rule-${i}-output`, input(rule.output ?? '', (v) => (rule.output = v))));
+      const rm = document.createElement('button'); rm.textContent = 'Remove rule'; rm.dataset.testid = `cfg-rule-${i}-remove`; rm.style.marginTop = '4px';
+      rm.addEventListener('click', () => { n.params.rules.splice(i, 1); render(); });
+      row.appendChild(rm);
+      c.appendChild(row);
+    });
+    const addBtn = document.createElement('button'); addBtn.textContent = '+ Add rule'; addBtn.dataset.testid = 'extract-add-rule';
+    addBtn.addEventListener('click', () => { n.params.rules.push({ selector: '', returnType: 'text', attribute: '', output: '' }); render(); });
+    c.appendChild(addBtn);
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }
