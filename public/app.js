@@ -12,6 +12,7 @@ const STEP_TYPES = [
   { type: 'limit', label: 'Limit', hint: 'Limit', category: 'Transform', icon: '🔢', desc: 'Cap how many items pass through, keeping at most N.' },
   { type: 'removeDuplicates', label: 'Remove duplicates', hint: 'Remove Duplicates', category: 'Transform', icon: '🧹', desc: 'Drop duplicate items, keeping only the distinct ones.' },
   { type: 'renameKeys', label: 'Rename keys', hint: 'Rename Keys', category: 'Transform', icon: '🏷️', desc: 'Rename fields (old name → new name), preserving values and other fields.' },
+  { type: 'dateTime', label: 'Date & time', hint: 'Date & Time', category: 'Transform', icon: '📅', desc: 'Format a date or add/subtract a span, writing the result onto the item.' },
   { type: 'if', label: 'Branch on a condition', hint: 'Conditional (IF)', category: 'Flow', icon: '❓', desc: 'Branch the run true/false on a condition.' },
   { type: 'switch', label: 'Route by rules', hint: 'Switch (multi-way)', category: 'Flow', icon: '🔀', desc: 'Route each item to an output by rules (multi-way).' },
   { type: 'filter', label: 'Keep matching items', hint: 'Filter', category: 'Flow', icon: '🔎', desc: 'Keep only items matching a condition; drop the rest.' },
@@ -59,6 +60,7 @@ function defaultParams(type) {
   if (type === 'limit') return { max: 1, keep: 'first' };
   if (type === 'removeDuplicates') return { by: 'field', field: 'json.id' };
   if (type === 'renameKeys') return { renames: { first: 'name' } };
+  if (type === 'dateTime') return { operation: 'add', dateField: 'json.date', amount: 1, unit: 'days', format: 'YYYY-MM-DD', outputName: 'result' };
   if (type === 'loop') return { batchSize: 1 };
   if (type === 'wait') return { ms: 1500 };
   if (type === 'stopError') return { message: 'Stopped with error' };
@@ -529,6 +531,24 @@ function renderConfig() {
     c.appendChild(note);
     n.params.renames = n.params.renames || {};
     c.appendChild(field('Rename mappings (JSON: "old":"new")', 'cfg-renames', textarea(jsonStr(n.params.renames), (v) => (n.params.renames = parseJsonSafe(v, n.params.renames)))));
+  } else if (n.type === 'dateTime') {
+    n.params.operation = n.params.operation ?? 'add';
+    const sel = document.createElement('select');
+    for (const op of ['add', 'subtract', 'format']) { const o = document.createElement('option'); o.value = op; o.textContent = op; if (n.params.operation === op) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => { n.params.operation = sel.value; render(); });
+    c.appendChild(field('Operation', 'cfg-dt-operation', sel));
+    c.appendChild(field('Date field (path)', 'cfg-dt-field', input(n.params.dateField ?? 'json.date', (v) => (n.params.dateField = v))));
+    if (n.params.operation === 'format') {
+      c.appendChild(field('Format (YYYY MM DD HH mm ss)', 'cfg-dt-format', input(n.params.format ?? 'YYYY-MM-DD', (v) => (n.params.format = v))));
+    } else {
+      const amt = input(String(n.params.amount ?? 1), (v) => (n.params.amount = Number(v) || 0)); amt.type = 'number';
+      c.appendChild(field('Amount', 'cfg-dt-amount', amt));
+      const us = document.createElement('select');
+      for (const u of ['days', 'hours', 'minutes', 'seconds']) { const o = document.createElement('option'); o.value = u; o.textContent = u; if ((n.params.unit ?? 'days') === u) o.selected = true; us.appendChild(o); }
+      us.addEventListener('change', () => { n.params.unit = us.value; });
+      c.appendChild(field('Unit', 'cfg-dt-unit', us));
+    }
+    c.appendChild(field('Output field name', 'cfg-dt-output', input(n.params.outputName ?? 'result', (v) => (n.params.outputName = v))));
   } else if (n.type === 'code') {
     c.appendChild(field('Code', 'cfg-code', textarea(n.params.code, (v) => (n.params.code = v))));
   }

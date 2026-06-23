@@ -101,6 +101,19 @@ function routeSwitch(params: any, items: Items): Record<string, Items> {
   return emit;
 }
 
+// Format a Date to a pattern using UTC components (deterministic).
+function formatDate(d: Date, fmt: string): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return fmt
+    .replace(/YYYY/g, String(d.getUTCFullYear()))
+    .replace(/MM/g, p(d.getUTCMonth() + 1))
+    .replace(/DD/g, p(d.getUTCDate()))
+    .replace(/HH/g, p(d.getUTCHours()))
+    .replace(/mm/g, p(d.getUTCMinutes()))
+    .replace(/ss/g, p(d.getUTCSeconds()));
+}
+const UNIT_MS: Record<string, number> = { days: 86400000, hours: 3600000, minutes: 60000, seconds: 1000 };
+
 // Execute a single (non-loop) node, returning its per-output-port items.
 async function execOne(node: GraphNode, input: Items): Promise<Record<string, Items>> {
   switch (node.type) {
@@ -182,6 +195,27 @@ async function execOne(node: GraphNode, input: Items): Promise<Record<string, It
             if (oldK in json) { json[newK] = json[oldK]; delete json[oldK]; }
           }
           return { json, binary: it.binary };
+        }),
+      };
+    }
+    case 'dateTime': {
+      // Date/time operation written onto each item; other fields preserved.
+      const p = node.params as any;
+      const op = p.operation ?? 'add';
+      const dateField = String(p.dateField ?? 'json.date');
+      const outName = String(p.outputName ?? 'result');
+      return {
+        main: input.map((it) => {
+          const d = new Date(String(getPath(it, dateField)));
+          let result: string;
+          if (op === 'format') {
+            result = formatDate(d, String(p.format ?? 'YYYY-MM-DD'));
+          } else {
+            const sign = op === 'subtract' ? -1 : 1;
+            const ms = (Number(p.amount) || 0) * (UNIT_MS[p.unit] ?? UNIT_MS.days);
+            result = new Date(d.getTime() + sign * ms).toISOString();
+          }
+          return { json: { ...it.json, [outName]: result }, binary: it.binary };
         }),
       };
     }
